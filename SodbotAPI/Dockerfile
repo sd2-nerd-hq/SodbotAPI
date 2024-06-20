@@ -1,24 +1,18 @@
-#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER app
 WORKDIR /app
-EXPOSE 8080
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-ARG BUILD_CONFIGURATION=Release
-WORKDIR /src
-COPY ["SodbotAPI/SodbotAPI.csproj", "SodbotAPI/"]
-RUN dotnet restore "./SodbotAPI/./SodbotAPI.csproj"
+COPY ["MyWebApiProject/MyWebApiProject.csproj", "MyWebApiProject/"]
+RUN dotnet restore "MyWebApiProject/MyWebApiProject.csproj"
+
 COPY . .
-WORKDIR "/src/SodbotAPI"
-RUN dotnet build "./SodbotAPI.csproj" -c $BUILD_CONFIGURATION -o /app/build
+WORKDIR "/src/MyWebApiProject"
+RUN dotnet publish "MyWebApiProject.csproj" -c Release -o /app/publish
 
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./SodbotAPI.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-FROM base AS final
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "SodbotAPI.dll"]
+COPY --from=build /app/publish .
+
+EXPOSE 5278
+
+ENTRYPOINT ["dotnet", "MyWebApiProject.dll"]
