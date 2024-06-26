@@ -17,10 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="DB\QueryResults\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Content Update="appsettings.json.example">
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

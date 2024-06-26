@@ -5,5 +5,4 @@ namespace SodbotAPI.Services;
 public abstract class SodbotService
 {
     protected AppDbContext Context;
-    protected IConfiguration Config;
 }

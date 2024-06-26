@@ -10,8 +10,7 @@ public class PlayersService : SodbotService
 {
     public PlayersService(IConfiguration config)
     {
-        this.Config = config;
-        this.Context = new AppDbContext(this.Config);
+        this.Context = new AppDbContext(config);
     }
 
     public List<Player> GetPlayers()

@@ -11,8 +11,7 @@ public class ReplaysService : SodbotService
 {
     public ReplaysService(IConfiguration config)
     {
-        this.Config = config;
-        this.Context = new AppDbContext(this.Config);
+        this.Context = new AppDbContext(config);
     }
 
     public List<Replay> GetReplays()
@@ -34,7 +33,7 @@ public class ReplaysService : SodbotService
         return this.Context.Replays.Include(r => r.ReplayPlayers).FirstOrDefault(r => r.Id == id);
     }
 
-    public Replay? AddReplay(ReplayDto input)
+    public Replay? AddReplay(ReplayDto input, bool immediateSave = true)
     {
         //gets the right elo to update in case the player doesn't exist
         var eloProp = GetEloProperty(input.ReplayPlayers.Count, input.Franchise);
@@ -108,11 +107,12 @@ public class ReplaysService : SodbotService
 
         this.Context.Replays.Add(replay);
 
-        this.Context.SaveChanges();
+        if (immediateSave)
+            this.Context.SaveChanges();
 
         return replay;
     }
-
+    
     public static PropertyInfo GetEloProperty(int playerCount, Franchise franchise)
     {
         bool isTeamGame = playerCount > 2;

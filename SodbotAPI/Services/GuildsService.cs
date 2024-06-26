@@ -9,8 +9,7 @@ public class GuildsService : SodbotService
 {
     public GuildsService(IConfiguration config)
     {
-        this.Config = config;
-        this.Context = new AppDbContext(this.Config);
+        this.Context = new AppDbContext(config);
     }
 
     public List<GuildGetDto> GetGuildsWithChannels()
