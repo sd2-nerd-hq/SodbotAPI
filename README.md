@@ -2,4 +2,4 @@
 
 https://github.com/sd2-nerd-hq/SD2-SODBOT
 
-Copy appsettings.json.example to appsettings.json and add the connection string to database
+ Add connection string to postgres database to appsettings.json
