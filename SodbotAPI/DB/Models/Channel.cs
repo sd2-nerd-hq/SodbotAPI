@@ -6,9 +6,9 @@ namespace SodbotAPI.DB.Models;
 public class Channel
 {
     [Column("id")]
-    public long Id { get; set; }
+    public string Id { get; set; }
     [Column("id_guild")]
-    public long GuildId { get; set; }
+    public string GuildId { get; set; }
     [Column("name")]
     public string Name { get; set; }
     [Column("skill_level")]

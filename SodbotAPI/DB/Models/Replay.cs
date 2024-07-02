@@ -18,10 +18,10 @@ public class Replay
     public string SessionId { get; set; }
     
     [Column("uploaded_in")]
-    public long UploadedIn { get; set; }
+    public string UploadedIn { get; set; }
     
     [Column("uploaded_by")]
-    public long UploadedBy { get; set; }
+    public string UploadedBy { get; set; }
     
     [Column("uploaded_at")]
     public DateTime UploadedAt { get; set; }

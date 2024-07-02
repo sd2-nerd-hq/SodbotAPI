@@ -4,9 +4,9 @@ public class ReplayDto
 {
         public string SessionId { get; set; }
         
-        public long UploadedIn { get; set; }
+        public string UploadedIn { get; set; }
         
-        public long UploadedBy { get; set; }
+        public string UploadedBy { get; set; }
         
         public DateTime UploadedAt { get; set; } = DateTime.Now;
         

@@ -2,7 +2,7 @@ namespace SodbotAPI.DB.Models.GuildsDtos;
 
 public class ChannelGetPostDto
 {
-    public long Id { get; set; }
+    public string Id { get; set; }
     
     public string Name { get; set; }
 

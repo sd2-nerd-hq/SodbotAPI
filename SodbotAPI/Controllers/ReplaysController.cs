@@ -4,6 +4,7 @@ using SodbotAPI.DB.Models;
 using SodbotAPI.DB.Models.ReplaysDtos;
 using SodbotAPI.Services;
 using Npgsql;
+using Npgsql.Replication.PgOutput;
 
 namespace SodbotAPI.Controllers;
 
@@ -33,21 +34,37 @@ public class ReplaysController : Controller
         
         try
         {
-            var replay = service.AddReplay(input);
+            Console.WriteLine("UploadingReplay");
+            
+            var tuple = service.AddReplay(input);
+            var replay = tuple.Item1;
 
             if (replay!.SkillLevel == SkillLevel.others)
+            {
+                replay.ReplayPlayers = tuple.Item2.Select(i => i.ReplayPlayer).ToList();
+                
+                Console.WriteLine("Others");
+                
                 return Ok(replay);
+            }
 
             
             var playerService = new PlayersService(this.config);
             
-            playerService.UpdatePlayersElo(input.ReplayPlayers, input.Franchise);
+            playerService.UpdatePlayersElo(tuple.Item2, input.Franchise);
+
+            replay.ReplayPlayers = tuple.Item2.Select(i => i.ReplayPlayer).ToList();
+            
+            replay.ReplayPlayers.ForEach(rp =>
+            {
+                Console.WriteLine($"{rp.OldSodbotElo} > {rp.SodbotElo} : {rp.SodbotElo - rp.OldSodbotElo}");
+            });
 
             return Ok(replay);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
         {
-            return Conflict("Replay already exists");
+            return Conflict(new {message = "Replay already exists"});
         }
     }
 }

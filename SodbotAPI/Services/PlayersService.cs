@@ -3,6 +3,7 @@ using SodbotAPI.DB;
 using SodbotAPI.DB.Models;
 using SodbotAPI.DB.Models.PlayersDtos;
 using SodbotAPI.DB.Models.ReplaysDtos;
+using Microsoft.EntityFrameworkCore;
 
 namespace SodbotAPI.Services;
 
@@ -23,11 +24,14 @@ public class PlayersService : SodbotService
         return this.Context.Players.Find(id);
     }
 
+    public List<Player> GetPlayersByIds(int[] ids)
+    {
+        return this.Context.Players.Where(p => ids.Contains(p.Id)).ToList();
+    }
+
     private class PlayerElo
     {
-        public Player player { get; set; }
-
-        public bool Victory { get; set; }
+        public ReplayPlayerWithPlayer RPWithPlayer { get; set; }
 
         public int GameCount { get; set; }
     }
@@ -69,11 +73,12 @@ public class PlayersService : SodbotService
 
     public List<PlayerWithGameCount> GetReplayCountsByPlayerIds(int[] ids, Franchise franchise, bool isTeamGame)
     {
-        var result = this.Context.Replays.Join(this.Context.ReplayPlayers,
+        return this.Context.Replays.Join(this.Context.ReplayPlayers,
                 replay => replay.Id,
                 repPlay => repPlay.ReplayId,
                 (replay, repPlay) => new { replay, repPlay })
-            .Where(r => ids.Contains(r.repPlay.PlayerId) && r.replay.Franchise == franchise && r.replay.IsTeamGame == isTeamGame)
+            .Where(r => ids.Contains(r.repPlay.PlayerId) && r.replay.Franchise == franchise &&
+                        r.replay.IsTeamGame == isTeamGame)
             .GroupBy(r => r.repPlay.PlayerId,
                 r => r.replay.Id,
                 (pid, rid) => new PlayerWithGameCount()
@@ -82,73 +87,50 @@ public class PlayersService : SodbotService
                     GameCount = rid.Count()
                 }
             ).ToList();
-
-        if (result.Count >= ids.Length)
-        {
-            return result;
-        }
-
-        foreach (var id in ids)
-        {
-            if (result.Any(r => r.Id == id))
-                continue;
-
-
-            var player = this.Context.Players.Find(id);
-
-            if (player is null)
-            {
-                continue;
-            }
-
-            result.Add(new PlayerWithGameCount()
-            {
-                Id = id,
-                GameCount = 0
-            });
-        }
-
-        return result;
     }
 
-    public List<Player> UpdatePlayersElo(List<ReplayPlayerDto> replayPlayers, Franchise franchise)
+    // public List<Player> UpdatePlayersElo(List<ReplayPlayerDto> replayPlayers, Franchise franchise)
+    public List<ReplayPlayerWithPlayer> UpdatePlayersElo(List<ReplayPlayerWithPlayer> replayPlayers,
+        Franchise franchise)
     {
-        List<PlayerElo> players = [];
+        var gameCounts = this.GetReplayCountsByPlayerIds(replayPlayers.Select(p => p.Player.Id).ToArray(),
+            franchise, replayPlayers.Count != 2);
 
-        //not really proud of this one, but there's max 20 players, so it's not like the complexity matters
-        foreach (var replayPlayer in replayPlayers)
+
+        var players = replayPlayers.Select(rp =>
         {
-            //should never be null, since it's called only after replay upload (which creates players if they don't exist)
-            var player = this.Context.Players.Find(replayPlayer.PlayerId);
+            var gameCount = gameCounts.FirstOrDefault(gc => gc.Id == rp.Player.Id);
 
-            players.Add(new PlayerElo()
+            if (gameCount is not null)
             {
-                player = player!,
-                Victory = replayPlayer.Victory
-            });
-        }
+                return new PlayerElo()
+                {
+                    GameCount = gameCount.GameCount,
+                    RPWithPlayer = rp
+                };
+            }
+            
+            return new PlayerElo()
+            {
+                GameCount = 0,
+                RPWithPlayer = rp
+            };
+        }).ToList();
 
-        var gameCounts = this.GetReplayCountsByPlayerIds(players.Select(p => p.player.Id).ToArray(), 
-                                                                                franchise, replayPlayers.Count != 2);
-
-        foreach (var player in players)
-        {
-            player.GameCount = gameCounts.FirstOrDefault(g => g.Id == player.player.Id)!.GameCount;
-        }
 
         var eloProp = ReplaysService.GetEloProperty(replayPlayers.Count, franchise);
         this.UpdateElo(players, eloProp);
-        
-        this.Context.Players.UpdateRange(players.Select(p => p.player));
+
+        this.Context.Players.UpdateRange(players.Select(p => p.RPWithPlayer.Player));
         this.Context.SaveChanges();
 
-        return players.Select(p => p.player).ToList();
+        return players.Select(p => p.RPWithPlayer).ToList();
     }
 
     private List<PlayerElo> UpdateElo(List<PlayerElo> players, PropertyInfo eloProp)
     {
-        double avgWinElo = players.Where(p => p.Victory).Average(p => this.GetEloFromPlayer(p.player, eloProp)!);
-        double avgLosElo = players.Where(p => !p.Victory).Average(p => this.GetEloFromPlayer(p.player, eloProp)!);
+        double avgWinElo = players.Where(p => p.RPWithPlayer.ReplayPlayer.Victory).Average(p => this.GetEloFromPlayer(p.RPWithPlayer.Player, eloProp)!);
+        double avgLosElo = players.Where(p => !p.RPWithPlayer.ReplayPlayer.Victory).Average(p => this.GetEloFromPlayer(p.RPWithPlayer.Player, eloProp)!);
 
         double expectedScoreForWinners = this.GetExpectedScore(avgWinElo, avgLosElo);
 
@@ -158,13 +140,19 @@ public class PlayersService : SodbotService
 
             if (player.GameCount < 10)
             {
-                k += 80 - player.GameCount * 8;
+                k += 12 - player.GameCount * 12;
             }
-
-            double elo = this.GetEloFromPlayer(player.player, eloProp);
             
-            eloProp.SetValue(player.player, elo + k * (player.Victory ? 1 - expectedScoreForWinners : 0 - (1 - expectedScoreForWinners)));
+            double elo = player.RPWithPlayer.ReplayPlayer.SodbotElo;
+            
+            player.RPWithPlayer.ReplayPlayer.OldSodbotElo = elo;
+            
+            elo += k * (player.RPWithPlayer.ReplayPlayer.Victory ? 1 - expectedScoreForWinners : 0 - (1 - expectedScoreForWinners));
+        
+            player.RPWithPlayer.ReplayPlayer.SodbotElo = elo;    
+            eloProp.SetValue(player.RPWithPlayer.Player, elo);
         }
+
         return players;
     }
 
@@ -176,4 +164,48 @@ public class PlayersService : SodbotService
 
         return expected;
     }
+
+    public Player? AddPlayer(Player player)
+    {
+        this.Context.Players.Add(player);
+
+        this.Context.SaveChanges();
+
+        return player;
+    }
+
+    public Player? UpdatePlayerDiscordId(int id, PlayerPutDto input)
+    {
+        var player = this.Context.Players.Find(id);
+
+        if (player is null)
+        {
+            player = new Player()
+            {
+                Id = id,
+                DiscordId = input.DiscordId,
+                Nickname = input.Nickname
+            };
+
+            this.AddPlayer(player);
+            return player;
+        }
+
+        if (player.DiscordId is not null)
+        {
+            return null;
+        }
+
+        player.DiscordId = input.DiscordId;
+        this.Context.SaveChanges();
+
+        return player;
+    }
+
+    // public List<PlayerWithRank>? GetPlayerAndSurroundingPlayersRank()
+    // {
+    //
+    //
+    //     
+    // }
 }

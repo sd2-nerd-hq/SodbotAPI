@@ -8,7 +8,7 @@ public class Player
     [Column("id")]
     public int Id { get; set; }
     [Column("discord_id")]
-    public long? DiscordId { get; set; }
+    public string? DiscordId { get; set; }
     [Column("sd_elo")]
     public double? SdElo { get; set; }
     [Column("sd_team_game_elo")]

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SodbotAPI.DB.Models;
+using SodbotAPI.DB.Models.ReplaysDtos;
 
 namespace SodbotAPI.DB;
 
@@ -52,6 +53,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Division>(e =>
         {
             e.Property(p => p.Franchise).HasColumnType("Franchise");
+            e.Property(p => p.Nation).HasColumnType("Nation");
         });
         
         

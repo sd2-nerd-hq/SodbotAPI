@@ -25,8 +25,8 @@ public class GuildsController : Controller
         return Ok(guilds);
     }
     
-    [HttpGet("{id:long}")]
-    public IActionResult Get(long id)
+    [HttpGet("{id}")]
+    public IActionResult Get(string id)
     {
         var service = new GuildsService(this.config);
 
@@ -34,7 +34,7 @@ public class GuildsController : Controller
 
         if (guild is null)
         {
-            return NotFound("Guild doesn't exist.");
+            return NotFound(new {message = "Guild doesn't exist"});
         }
 
         return Ok(guild);
@@ -50,8 +50,8 @@ public class GuildsController : Controller
         return Ok(guild!);
     }
     
-    [HttpPut("{id:long}")]
-    public IActionResult Put(long id, [FromBody] GuildPutDto input)
+    [HttpPut("{id}")]
+    public IActionResult Put(string id, [FromBody] GuildPutDto input)
     {
         var service = new GuildsService(this.config);
 
@@ -59,14 +59,14 @@ public class GuildsController : Controller
 
         if (guild is null)
         {
-            return NotFound("Guild doesn't exist.");
+            return NotFound(new {message ="Guild doesn't exist"});
         }
 
         return Ok(guild);
     }
     
-    [HttpGet("channels/{id:long}")]
-    public IActionResult GetChannel(long id)
+    [HttpGet("channels/{id}")]
+    public IActionResult GetChannel(string id)
     {
         var service = new GuildsService(this.config);
 
@@ -74,7 +74,7 @@ public class GuildsController : Controller
 
         if (channel is null)
         {
-            return NotFound("Channel doesn't exist.");
+            return NotFound(new {message ="Channel doesn't exist."});
         }
 
         return Ok(channel);
@@ -89,7 +89,7 @@ public class GuildsController : Controller
     //     
     //     if (channel is null)
     //     {
-    //         return NotFound("Channel doesn't exist.");
+    //         return NotFound(new {message = "Channel doesn't exist."});
     //     }
     //     
     //     return Ok(channel);
@@ -104,14 +104,14 @@ public class GuildsController : Controller
         
         if (channel is null)
         {
-            return NotFound("Channel doesn't exist.");
+            return NotFound(new {message = "Channel doesn't exist"});
         }
         
         return Ok(channel);
     }
     
-    [HttpPut("channels/{id:long}")]
-    public IActionResult Put(long id, [FromBody] ChannelPutDto input)
+    [HttpPut("channels/{id}")]
+    public IActionResult Put(string id, [FromBody] ChannelPutDto input)
     {
         var service = new GuildsService(this.config);
 
@@ -119,7 +119,7 @@ public class GuildsController : Controller
         
         if (channel is null)
         {
-            return NotFound("Channel doesn't exist.");
+            return NotFound(new {message = "Channel doesn't exist"});
         }
         
         return Ok(channel);

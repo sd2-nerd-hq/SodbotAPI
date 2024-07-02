@@ -33,18 +33,25 @@ public class ReplaysService : SodbotService
         return this.Context.Replays.Include(r => r.ReplayPlayers).FirstOrDefault(r => r.Id == id);
     }
 
-    public Replay? AddReplay(ReplayDto input, bool immediateSave = true)
+    public (ReplayWithOldElo?, List<ReplayPlayerWithPlayer>) AddReplay(ReplayDto input, bool immediateSave = true)
     {
-        //gets the right elo to update in case the player doesn't exist
+        //gets the type of elo to add if the player's not registered yet
         var eloProp = GetEloProperty(input.ReplayPlayers.Count, input.Franchise);
+
+        var ids = input.ReplayPlayers.Select(p => p.PlayerId);
+
+        var players = this.Context.Players.Where(p => ids.Any(id => p.Id == id)).ToList();
+
+        List<ReplayPlayerWithPlayer> rpPlayers = new(input.ReplayPlayers.Count);
+        
 
         input.ReplayPlayers.ForEach(player =>
         {
-            var existingPlayer = this.Context.Players.Find(player.PlayerId);
+            var existingPlayer = players.FirstOrDefault(p => p.Id == player.PlayerId);
+            
             if (existingPlayer is null)
             {
-                // var elo = (double)eloProp.GetValue(existingPlayer)!;
-                var p = new Player()
+                existingPlayer = new Player()
                 {
                     Id = player.PlayerId,
                     Nickname = player.Nickname,
@@ -53,14 +60,22 @@ public class ReplaysService : SodbotService
                     WarnoElo = null,
                     WarnoTeamGameElo = null
                 };
-                eloProp.SetValue(p, 1200 + (player.Elo - 1200) / 5);
+                eloProp.SetValue(existingPlayer, 1200 + (player.Elo - 1200) / 5);
 
-                this.Context.Players.Add(p);
+                this.Context.Players.Add(existingPlayer);
             }
             else if (eloProp.GetValue(existingPlayer) is null)
             {
                 eloProp.SetValue(existingPlayer, 1200 + (player.Elo - 1200) / 5);
             }
+
+            rpPlayers.Add(new ReplayPlayerWithPlayer()
+            {
+                ReplayPlayer = new ReplayPlayerWithSodbotElo(player, existingPlayer.DiscordId,
+                    (double)eloProp.GetValue(existingPlayer)!),
+                Player = existingPlayer
+            });
+
         });
 
 
@@ -89,7 +104,8 @@ public class ReplaysService : SodbotService
             DurationSec = input.DurationSec,
             SkillLevel = replayType.Value,
         };
-
+        
+        
         var replayPlayers = input.ReplayPlayers.Select(r => new ReplayPlayer()
         {
             PlayerId = r.PlayerId,
@@ -109,10 +125,12 @@ public class ReplaysService : SodbotService
 
         if (immediateSave)
             this.Context.SaveChanges();
+        
+        var output = new ReplayWithOldElo(replay, new(rpPlayers.Count));
 
-        return replay;
+        return (output, rpPlayers);
     }
-    
+
     public static PropertyInfo GetEloProperty(int playerCount, Franchise franchise)
     {
         bool isTeamGame = playerCount > 2;

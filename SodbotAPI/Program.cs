@@ -13,6 +13,7 @@ namespace SodbotAPI
             NpgsqlConnection.GlobalTypeMapper.MapEnum<MapType>("mapType");
             NpgsqlConnection.GlobalTypeMapper.MapEnum<Income>("income");
             NpgsqlConnection.GlobalTypeMapper.MapEnum<Franchise>("franchise");
+            NpgsqlConnection.GlobalTypeMapper.MapEnum<Nation>("nation");
 
             // NpgsqlConnection.GlobalTypeMapper.EnableUnmappedTypes();
             
@@ -48,6 +49,4 @@ namespace SodbotAPI
             app.Run();
         }
     }
-    
-    
 }

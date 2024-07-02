@@ -29,7 +29,7 @@ public class GuildsService : SodbotService
         return output;
     }
 
-    public Guild? GetGuild(long id)
+    public Guild? GetGuild(string id)
     {
         var guild = this.Context.Guilds.Include(g => g.Channels).FirstOrDefault(g => g.Id == id);
 
@@ -44,7 +44,7 @@ public class GuildsService : SodbotService
         return input;
     }
 
-    public Guild? UpdateGuild(long id, GuildPutDto input)
+    public Guild? UpdateGuild(string id, GuildPutDto input)
     {
         var guild = this.Context.Guilds.FirstOrDefault(g => g.Id == id);
 
@@ -60,7 +60,7 @@ public class GuildsService : SodbotService
         return guild;
     }
     
-    public Channel? GetChannel(long id)
+    public Channel? GetChannel(string id)
     {
         var channel = this.Context.Channels.Find(id);
 
@@ -118,7 +118,7 @@ public class GuildsService : SodbotService
         return channel;
     }
     
-    public Channel? UpdateChannel(long id, ChannelPutDto input)
+    public Channel? UpdateChannel(string id, ChannelPutDto input)
     {
         var channel = this.Context.Channels.FirstOrDefault(c => c.Id == id);
         

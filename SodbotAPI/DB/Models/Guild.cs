@@ -6,7 +6,7 @@ namespace SodbotAPI.DB.Models;
 public class Guild
 {
     [Column("id")]
-    public long Id { get; set; }
+    public string Id { get; set; }
     [Column("name")]
     public string Name { get; set; }
     [ForeignKey("GuildId")]
