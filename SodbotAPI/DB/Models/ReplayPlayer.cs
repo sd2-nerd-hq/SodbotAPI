@@ -30,9 +30,6 @@ public class ReplayPlayer
     [Column("division")]
     public int Division { get; set; }
 
-    [Column("faction")]
-    public bool Faction { get; set; } //0 - axis
-
     [Column("income")]
     public Income? Income { get; set; } //warno has no income
     

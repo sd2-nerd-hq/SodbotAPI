@@ -34,16 +34,12 @@ public class ReplaysController : Controller
         
         try
         {
-            Console.WriteLine("UploadingReplay");
-            
             var tuple = service.AddReplay(input);
             var replay = tuple.Item1;
 
             if (replay!.SkillLevel == SkillLevel.others)
             {
                 replay.ReplayPlayers = tuple.Item2.Select(i => i.ReplayPlayer).ToList();
-                
-                Console.WriteLine("Others");
                 
                 return Ok(replay);
             }
@@ -55,11 +51,6 @@ public class ReplaysController : Controller
 
             replay.ReplayPlayers = tuple.Item2.Select(i => i.ReplayPlayer).ToList();
             
-            replay.ReplayPlayers.ForEach(rp =>
-            {
-                Console.WriteLine($"{rp.OldSodbotElo} > {rp.SodbotElo} : {rp.SodbotElo - rp.OldSodbotElo}");
-            });
-
             return Ok(replay);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })

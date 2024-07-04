@@ -66,6 +66,52 @@ public class PlayersController : Controller
 
         return Ok(result);
     }
+    [HttpGet("rank")]
+    public IActionResult GetPlayersWithRank(int? pageSize = null, int? pageNumber = null, string eloType = "SdElo")
+    {
+        var service = new PlayersService(this.config);
+        
+        var eloProp = ReplaysService.GetEloProperty(eloType);
+        
+        if (eloProp is null)
+        {
+            return BadRequest(new { message = "Invalid elo type" });
+        }
+
+        var result = service.GetPlayersWithRank(pageSize, pageNumber, eloProp);
+
+        return Ok(result);
+    }
+    
+    [HttpGet("rank/{id}")]
+    public IActionResult GetSurroundingPlayersWithRank(string id,  string eloType = "SdElo")
+    {
+        var service = new PlayersService(this.config);
+
+        var player = service.GetPlayerByDiscordId(id);
+
+        if (player is null)
+        {
+            return NotFound(new { message = "Player not found" });
+        }
+        
+
+        var eloProp = ReplaysService.GetEloProperty(eloType);
+
+        if (eloProp is null)
+        {
+            return BadRequest(new { message = "Invalid elo type" });
+        }
+
+        var result = service.GetPlayerAndSurroundingPlayersRank(id, eloProp);
+        
+        if (result is null)
+        {
+            return NotFound(new { message = "Player doesn't have elo yet" });
+        }
+
+        return Ok(result);
+    }
 
     [HttpPut("{id:int}")]
     public IActionResult UpdatePlayer(int id, [FromBody] PlayerPutDto player)

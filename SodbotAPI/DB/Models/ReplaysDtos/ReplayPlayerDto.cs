@@ -14,8 +14,6 @@ public class ReplayPlayerDto
 
     public int Division { get; set; }
 
-    public bool Faction { get; set; } //0 - axis
-
     public Income? Income { get; set; }
     
     public string DeckCode { get; set; }

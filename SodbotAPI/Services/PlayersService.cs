@@ -1,4 +1,6 @@
+using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.Versioning;
 using SodbotAPI.DB;
 using SodbotAPI.DB.Models;
 using SodbotAPI.DB.Models.PlayersDtos;
@@ -28,47 +30,17 @@ public class PlayersService : SodbotService
     {
         return this.Context.Players.Where(p => ids.Contains(p.Id)).ToList();
     }
+    
+    public Player? GetPlayerByDiscordId(string discordId)
+    {
+        return this.Context.Players.FirstOrDefault(p => p.DiscordId == discordId);
+    }
 
     private class PlayerElo
     {
         public ReplayPlayerWithPlayer RPWithPlayer { get; set; }
 
         public int GameCount { get; set; }
-    }
-
-    public PlayerWithGameCount? GetReplayCountByPlayerId(int id)
-    {
-        var result = this.Context.Replays.Join(this.Context.ReplayPlayers,
-                replay => replay.Id,
-                repPlay => repPlay.ReplayId,
-                (replay, repPlay) => new { replay, repPlay })
-            .Where(r => r.repPlay.PlayerId == id)
-            .GroupBy(r => r.repPlay.PlayerId,
-                r => r.replay.Id,
-                (pid, rid) => new PlayerWithGameCount()
-                {
-                    Id = pid,
-                    GameCount = rid.Count()
-                }
-            ).FirstOrDefault();
-
-        if (result is null)
-        {
-            var player = this.Context.Players.Find(id);
-
-            if (player is null)
-            {
-                return null;
-            }
-
-            result = new PlayerWithGameCount()
-            {
-                Id = id,
-                GameCount = 0
-            };
-        }
-
-        return result;
     }
 
     public List<PlayerWithGameCount> GetReplayCountsByPlayerIds(int[] ids, Franchise franchise, bool isTeamGame)
@@ -140,7 +112,7 @@ public class PlayersService : SodbotService
 
             if (player.GameCount < 10)
             {
-                k += 12 - player.GameCount * 12;
+                k += 120 - player.GameCount * 12;
             }
             
             double elo = player.RPWithPlayer.ReplayPlayer.SodbotElo;
@@ -202,10 +174,76 @@ public class PlayersService : SodbotService
         return player;
     }
 
-    // public List<PlayerWithRank>? GetPlayerAndSurroundingPlayersRank()
-    // {
-    //
-    //
-    //     
-    // }
+    public IEnumerable<PlayerWithRank>? GetPlayersWithRank(int? pageSize, int? pageNumber, PropertyInfo eloType)
+    {
+        var parameter = Expression.Parameter(typeof(Player), "p");
+        var property = Expression.Property(parameter, eloType);
+        var notNullCheck = Expression.NotEqual(property, Expression.Constant(null));
+        var labdaFunc = Expression.Lambda<Func<Player, bool>>(notNullCheck, parameter);
+
+        var orderBy = Expression.Lambda(property, parameter);
+        
+        IQueryable<Player> query = this.Context.Players
+            .Where(labdaFunc);
+
+        query = ApplyOrderByDescending(query, orderBy);
+        
+
+        int skipped = 0;
+        if(pageNumber is not null && pageSize is not null)
+        {
+            
+            skipped = (pageNumber.Value - 1) * pageSize.Value;
+            
+            query = query.Skip(skipped).Take(pageSize.Value);
+        }
+        
+        var players = query.ToList()
+            .Select((p, index) =>
+            {
+                
+                return new PlayerWithRank()
+                {
+                    Id = p.Id,
+                    DiscordId = p.DiscordId,
+                    Name = p.Nickname,
+                    Elo = (double)eloType.GetValue(p)!,
+                    Rank = index + 1 + skipped
+                };
+            });
+
+
+        return players;
+    }
+    //have no idea what this is lol
+    private static IQueryable<Player> ApplyOrderByDescending(IQueryable<Player> query, LambdaExpression orderByLambda)
+    {
+        var orderByDescendingMethod = typeof(Queryable)
+            .GetMethods()
+            .Single(m => m.Name == "OrderByDescending" && m.GetParameters().Length == 2)
+            .MakeGenericMethod(typeof(Player), orderByLambda.ReturnType);
+
+        return (IQueryable<Player>)orderByDescendingMethod.Invoke(null, new object[] { query, orderByLambda })!;
+    }
+    public IEnumerable<PlayerWithRank>? GetPlayerAndSurroundingPlayersRank(string targetId, PropertyInfo eloType)
+    {
+        var rankedPlayers = this.GetPlayersWithRank(null, null, eloType);
+        
+        if (rankedPlayers is null)
+        {
+            return null;
+        }
+
+        var player = rankedPlayers.FirstOrDefault(p => p.DiscordId == targetId);
+        
+        if (player is null)
+        {
+            return null;
+        }
+
+        var lowerBound = player.Rank - 5;
+        var upperBound =  player.Rank + 5;
+
+        return rankedPlayers.Where(p => p.Rank >= lowerBound && p.Rank <= upperBound);
+    }
 }

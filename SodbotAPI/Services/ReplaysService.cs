@@ -21,7 +21,7 @@ public class ReplaysService : SodbotService
         return replays;
     }
 
-    public List<Replay> GetReplaysWithPlayers()
+    public IEnumerable<Replay> GetReplaysWithPlayers()
     {
         var replays = this.Context.Replays.Include(r => r.ReplayPlayers).ToList();
 
@@ -114,7 +114,6 @@ public class ReplaysService : SodbotService
             MapSide = r.MapSide,
             Victory = r.Victory,
             Division = r.Division,
-            Faction = r.Faction,
             Income = r.Income,
             DeckCode = r.DeckCode
         }).ToList();
@@ -141,9 +140,14 @@ public class ReplaysService : SodbotService
             : (isTeamGame ? "WarnoTeamGameElo" : "WarnoElo");
 
 
-        var playerType = typeof(Player);
-
         //no need for nullable type, will always be found
-        return playerType.GetProperty(eloPropName)!;
+        return ReplaysService.GetEloProperty(eloPropName)!;
+    }
+    
+    public static PropertyInfo? GetEloProperty(string propName)
+    {
+        var playerType = typeof(Player);
+        
+        return playerType.GetProperty(propName, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
     }
 }
