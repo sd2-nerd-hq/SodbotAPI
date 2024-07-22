@@ -34,7 +34,6 @@ public class ReplayPlayer
     public Income? Income { get; set; } //warno has no income
     
     [Column("deck_code")]
-    [MaxLength(250)]
     public string DeckCode { get; set; }
 }
 
