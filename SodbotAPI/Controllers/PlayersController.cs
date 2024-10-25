@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -40,6 +41,21 @@ public class PlayersController : Controller
             return NotFound(new { message = "Player not found" });
         }
 
+        return Ok(player);
+    }
+
+    [HttpGet("aliases/{id:int}")]
+    public IActionResult GetPlayerAliasesById(int id)
+    {
+        var service = new PlayersService(this.config);
+        
+        var player = service.GetPlayerWithAliases(id);
+        
+        if (player is null)
+        {
+            return NotFound(new { message = "Player not found" });
+        }
+        
         return Ok(player);
     }
 
@@ -86,16 +102,30 @@ public class PlayersController : Controller
     [HttpGet("rank/{id}")]
     public IActionResult GetSurroundingPlayersWithRank(string id,  string eloType = "SdElo")
     {
+        
         var service = new PlayersService(this.config);
 
-        var player = service.GetPlayerByDiscordId(id);
+        //check if ID is eugen ID or discord ID
+
+        Player? player;
+        string? message;
+        if (id.Length <= 8)
+        {
+            player = service.GetPlayer(Convert.ToInt32(id));
+            message = "Player not found";
+        }
+        else
+        {
+            player =  service.GetPlayerByDiscordId(id);
+            message = "Player with given Discord ID isn't registered";
+            
+        }
 
         if (player is null)
         {
-            return NotFound(new { message = "Player not found" });
+            return NotFound(new { message });
         }
         
-
         var eloProp = ReplaysService.GetEloProperty(eloType);
 
         if (eloProp is null)
@@ -103,7 +133,7 @@ public class PlayersController : Controller
             return BadRequest(new { message = "Invalid elo type" });
         }
 
-        var result = service.GetPlayerAndSurroundingPlayersRank(id, eloProp);
+        var result = service.GetPlayerAndSurroundingPlayersRank(player.Id, eloProp);
         
         if (result is null)
         {

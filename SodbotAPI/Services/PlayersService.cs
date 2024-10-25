@@ -60,10 +60,8 @@ public class PlayersService : SodbotService
                 }
             ).ToList();
     }
-
-    // public List<Player> UpdatePlayersElo(List<ReplayPlayerDto> replayPlayers, Franchise franchise)
-    public List<ReplayPlayerWithPlayer> UpdatePlayersElo(List<ReplayPlayerWithPlayer> replayPlayers,
-        Franchise franchise)
+    
+    public List<ReplayPlayerWithPlayer> UpdatePlayersEloUsingGameCount(List<ReplayPlayerWithPlayer> replayPlayers, Franchise franchise)
     {
         var gameCounts = this.GetReplayCountsByPlayerIds(replayPlayers.Select(p => p.Player.Id).ToArray(),
             franchise, replayPlayers.Count != 2);
@@ -91,7 +89,7 @@ public class PlayersService : SodbotService
 
 
         var eloProp = ReplaysService.GetEloProperty(replayPlayers.Count, franchise);
-        this.UpdateElo(players, eloProp);
+        this.UpdateEloUsingGameCount(players, eloProp);
 
         this.Context.Players.UpdateRange(players.Select(p => p.RPWithPlayer.Player));
         this.Context.SaveChanges();
@@ -99,10 +97,24 @@ public class PlayersService : SodbotService
         return players.Select(p => p.RPWithPlayer).ToList();
     }
 
-    private List<PlayerElo> UpdateElo(List<PlayerElo> players, PropertyInfo eloProp)
+    private IEnumerable<PlayerElo> UpdateEloUsingGameCount(List<PlayerElo> players, PropertyInfo eloProp)
     {
-        double avgWinElo = players.Where(p => p.RPWithPlayer.ReplayPlayer.Victory).Average(p => this.GetEloFromPlayer(p.RPWithPlayer.Player, eloProp)!);
-        double avgLosElo = players.Where(p => !p.RPWithPlayer.ReplayPlayer.Victory).Average(p => this.GetEloFromPlayer(p.RPWithPlayer.Player, eloProp)!);
+        var ps = players.Where(p => p.RPWithPlayer.ReplayPlayer.Victory).ToList();
+        
+        if(ps.Count == 0)
+        {
+            return players;
+        }
+        double avgWinElo = ps.Average(p => this.GetEloFromPlayer(p.RPWithPlayer.Player, eloProp)!);
+
+        ps = players.Where(p => !p.RPWithPlayer.ReplayPlayer.Victory).ToList();
+        
+        if(ps.Count == 0)
+        {
+            return players;
+        }
+        double avgLosElo = ps.Average(p => this.GetEloFromPlayer(p.RPWithPlayer.Player, eloProp)!);
+        
 
         double expectedScoreForWinners = this.GetExpectedScore(avgWinElo, avgLosElo);
 
@@ -128,6 +140,55 @@ public class PlayersService : SodbotService
         return players;
     }
 
+    public async Task<IEnumerable<ReplayPlayerWithPlayer>> UpdatePlayersElo(List<ReplayPlayerWithPlayer> players, Franchise franchise)
+    { 
+        var eloProp = ReplaysService.GetEloProperty(players.Count, franchise);
+        this.UpdateElo(players, eloProp);
+
+        this.Context.Players.UpdateRange(players.Select(p => p.Player));
+        await this.Context.SaveChangesAsync();
+
+        return players.Select(p => p);
+    }
+    private IEnumerable<ReplayPlayerWithPlayer> UpdateElo(List<ReplayPlayerWithPlayer> players, PropertyInfo eloProp)
+    {
+        {
+            var ps = players.Where(p => p.ReplayPlayer.Victory).ToList();
+            
+            if(ps.Count == 0)
+            {
+                return players;
+            }
+            double avgWinElo = ps.Average(p => this.GetEloFromPlayer(p.Player, eloProp)!);
+
+            ps = players.Where(p => !p.ReplayPlayer.Victory).ToList();
+        
+            if(ps.Count == 0)
+            {
+                return players;
+            }
+            double avgLosElo = ps.Average(p => this.GetEloFromPlayer(p.Player, eloProp)!);
+        
+
+            double expectedScoreForWinners = this.GetExpectedScore(avgWinElo, avgLosElo);
+
+            foreach (var player in players)
+            {
+                int k = 25;
+            
+                double elo = player.ReplayPlayer.SodbotElo;
+            
+                player.ReplayPlayer.OldSodbotElo = elo;
+            
+                elo += k * (player.ReplayPlayer.Victory ? 1 - expectedScoreForWinners : 0 - (1 - expectedScoreForWinners));
+        
+                player.ReplayPlayer.SodbotElo = elo;    
+                eloProp.SetValue(player.Player, elo);
+            }
+
+            return players;
+        }
+    }
     private double GetEloFromPlayer(Player player, PropertyInfo eloProp) => (double)eloProp.GetValue(player)!;
 
     private double GetExpectedScore(double d1, double d2)
@@ -225,7 +286,7 @@ public class PlayersService : SodbotService
 
         return (IQueryable<Player>)orderByDescendingMethod.Invoke(null, new object[] { query, orderByLambda })!;
     }
-    public IEnumerable<PlayerWithRank>? GetPlayerAndSurroundingPlayersRank(string targetId, PropertyInfo eloType)
+    public IEnumerable<PlayerWithRank>? GetPlayerAndSurroundingPlayersRank(int targetId, PropertyInfo eloType)
     {
         var rankedPlayers = this.GetPlayersWithRank(null, null, eloType);
         
@@ -234,7 +295,7 @@ public class PlayersService : SodbotService
             return null;
         }
 
-        var player = rankedPlayers.FirstOrDefault(p => p.DiscordId == targetId);
+        var player = rankedPlayers.FirstOrDefault(p => p.Id == targetId);
         
         if (player is null)
         {
@@ -246,4 +307,35 @@ public class PlayersService : SodbotService
 
         return rankedPlayers.Where(p => p.Rank >= lowerBound && p.Rank <= upperBound);
     }
+    public PlayerAliasesDto? GetPlayerWithAliases(int id)
+    {
+        var aliases = this.Context.ReplayPlayers.Where(rp => rp.PlayerId == id)
+            .GroupBy(rp => rp.Nickname)
+            .Select(e => new AliasWithCount()
+            {
+                Nickname = e.Key,
+                Count = e.Count()
+            })
+            .OrderByDescending(e => e.Count)
+            .Take(5)
+            .Select(E => E.Nickname)
+            .ToList();
+
+        if (aliases.Count == 0)
+            return null;
+        
+        return new PlayerAliasesDto()
+        {
+            Id = id,
+            Aliases = aliases
+        };
+    }
+
+    private class AliasWithCount
+    {
+        public string Nickname { get; set; }
+        public int Count { get; set; }
+    }
+    
+    
 }

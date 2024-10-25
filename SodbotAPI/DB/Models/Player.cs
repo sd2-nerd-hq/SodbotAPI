@@ -19,6 +19,4 @@ public class Player
     public double? WarnoTeamGameElo { get; set; }
     [Column("nickname")]
     public string Nickname { get; set; }
-     [Column("also_known_as", TypeName = "varchar(255)[]")]
-     public string[]? AlsoKnownAs { get; set; }
 }
