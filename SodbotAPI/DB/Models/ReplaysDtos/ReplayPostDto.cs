@@ -1,6 +1,6 @@
 namespace SodbotAPI.DB.Models.ReplaysDtos;
 
-public class ReplayDto
+public class ReplayPostDto
 {
         public string SessionId { get; set; }
         
@@ -24,7 +24,7 @@ public class ReplayDto
         
         public int DurationSec { get; set; }
         
-        public SkillLevel? ReplayType { get; set; }
+        public SkillLevel? SkillLevel { get; set; }
         
-        public List<ReplayPlayerDto> ReplayPlayers { get; set; }
+        public List<ReplayPlayerPostDto> ReplayPlayers { get; set; }
 }

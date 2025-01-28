@@ -99,7 +99,7 @@ public class PlayersService : SodbotService
 
     private IEnumerable<PlayerElo> UpdateEloUsingGameCount(List<PlayerElo> players, PropertyInfo eloProp)
     {
-        var ps = players.Where(p => p.RPWithPlayer.ReplayPlayer.Victory).ToList();
+        var ps = players.Where(p => p.RPWithPlayer.UploadReplayPlayerPost.Victory).ToList();
         
         if(ps.Count == 0)
         {
@@ -107,7 +107,7 @@ public class PlayersService : SodbotService
         }
         double avgWinElo = ps.Average(p => this.GetEloFromPlayer(p.RPWithPlayer.Player, eloProp)!);
 
-        ps = players.Where(p => !p.RPWithPlayer.ReplayPlayer.Victory).ToList();
+        ps = players.Where(p => !p.RPWithPlayer.UploadReplayPlayerPost.Victory).ToList();
         
         if(ps.Count == 0)
         {
@@ -127,13 +127,13 @@ public class PlayersService : SodbotService
                 k += 120 - player.GameCount * 12;
             }
             
-            double elo = player.RPWithPlayer.ReplayPlayer.SodbotElo;
+            double elo = player.RPWithPlayer.UploadReplayPlayerPost.SodbotElo;
             
-            player.RPWithPlayer.ReplayPlayer.OldSodbotElo = elo;
+            player.RPWithPlayer.UploadReplayPlayerPost.OldSodbotElo = elo;
             
-            elo += k * (player.RPWithPlayer.ReplayPlayer.Victory ? 1 - expectedScoreForWinners : 0 - (1 - expectedScoreForWinners));
+            elo += k * (player.RPWithPlayer.UploadReplayPlayerPost.Victory ? 1 - expectedScoreForWinners : 0 - (1 - expectedScoreForWinners));
         
-            player.RPWithPlayer.ReplayPlayer.SodbotElo = elo;    
+            player.RPWithPlayer.UploadReplayPlayerPost.SodbotElo = elo;    
             eloProp.SetValue(player.RPWithPlayer.Player, elo);
         }
 
@@ -153,20 +153,22 @@ public class PlayersService : SodbotService
     private IEnumerable<ReplayPlayerWithPlayer> UpdateElo(List<ReplayPlayerWithPlayer> players, PropertyInfo eloProp)
     {
         {
-            var ps = players.Where(p => p.ReplayPlayer.Victory).ToList();
+            var ps = players.Where(p => p.UploadReplayPlayerPost.Victory).ToList();
             
             if(ps.Count == 0)
             {
                 return players;
             }
+            
             double avgWinElo = ps.Average(p => this.GetEloFromPlayer(p.Player, eloProp)!);
 
-            ps = players.Where(p => !p.ReplayPlayer.Victory).ToList();
+            ps = players.Where(p => !p.UploadReplayPlayerPost.Victory).ToList();
         
             if(ps.Count == 0)
             {
                 return players;
             }
+            
             double avgLosElo = ps.Average(p => this.GetEloFromPlayer(p.Player, eloProp)!);
         
 
@@ -176,13 +178,13 @@ public class PlayersService : SodbotService
             {
                 int k = 25;
             
-                double elo = player.ReplayPlayer.SodbotElo;
+                double elo = player.UploadReplayPlayerPost.SodbotElo;
             
-                player.ReplayPlayer.OldSodbotElo = elo;
+                player.UploadReplayPlayerPost.OldSodbotElo = elo;
             
-                elo += k * (player.ReplayPlayer.Victory ? 1 - expectedScoreForWinners : 0 - (1 - expectedScoreForWinners));
+                elo += k * (player.UploadReplayPlayerPost.Victory ? 1 - expectedScoreForWinners : 0 - (1 - expectedScoreForWinners));
         
-                player.ReplayPlayer.SodbotElo = elo;    
+                player.UploadReplayPlayerPost.SodbotElo = elo;    
                 eloProp.SetValue(player.Player, elo);
             }
 

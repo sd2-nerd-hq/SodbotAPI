@@ -1,12 +1,12 @@
 namespace SodbotAPI.DB.Models.ReplaysDtos;
 
-public class ReplayPlayerDto
+public class ReplayPlayerPostDto
 {
-    public ReplayPlayerDto()
+    public ReplayPlayerPostDto()
     {
         
     }
-    public ReplayPlayerDto(ReplayPlayer rp)
+    public ReplayPlayerPostDto(ReplayPlayer rp)
     {
         this.PlayerId = rp.PlayerId;
         this.Nickname = rp.Nickname;

@@ -2,16 +2,12 @@
 .vs/
 .idea/
 
-
 appsettings.json
 
 *.swp
-*.*~
 project.lock.json
 .DS_Store
 *.pyc
-
-*.cs
 
 .vscode
 

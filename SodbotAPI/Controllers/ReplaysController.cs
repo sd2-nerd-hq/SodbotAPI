@@ -23,59 +23,29 @@ public class ReplaysController : Controller
     {
         var service = new ReplaysService(this.config);
 
-        var replays = service.GetReplaysWithPlayers();
+        var replays = service.GetReplays();
 
         return Ok(replays);
     }
-
+    
     [HttpPost]
-    public async Task<IActionResult> Post([FromBody] ReplayDto input)
+    public async Task<IActionResult> Post([FromBody] ReplayPostDto input)
     {
         var service = new ReplaysService(this.config);
-        ReplayWithOldElo? replay = null;
-        try
+
+        var result = await service.UploadReplay(input);
+
+        if (result.Item1 == 409)
         {
-            var tuple = await service.AddReplay(input, false);
-            replay = tuple.Item1;
-            await service.SaveChangesAsync();
-
-            if (replay!.SkillLevel == SkillLevel.others)
-            {
-                replay.ReplayPlayers = tuple.Item2.Select(i => i.ReplayPlayer).ToList();
-
-                return Ok(replay);
-            }
-
-
-            var playerService = new PlayersService(this.config);
-
-            await playerService.UpdatePlayersElo(tuple.Item2, input.Franchise);
-
-            replay.ReplayPlayers = tuple.Item2.Select(i => i.ReplayPlayer).ToList();
-
-            return Ok(replay);
+            //replay will have ID=0, I'd need to find it in the db otherwise (unnecessary at least for now)
+            return Conflict(new { message = "Replay already exists" , replay = result.Item2 });
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
-        {
-            Replay? ogReplay = service.GetReplay(input.SessionId);
-
-            List<ReplayPlayerWithEloDifference> players = new();
-            ogReplay?.ReplayPlayers.ForEach(rp => players.Add(new ReplayPlayerWithEloDifference()));
-
-            replay = new ReplayWithOldElo(ogReplay, );
-
-            if (ogReplay is null)
-            {
-                return StatusCode(500);
-            }
-            
-            
-            return Conflict(new { message = "Replay already exists" , replay });
-        }
+        
+        return Ok(new {message = "Successfully uploaded replay", replay = result.Item2});
     }
 
     [HttpPost("bulk")]
-    public async Task<IActionResult> Post([FromBody] List<ReplayDto> input)
+    public async Task<IActionResult> Post([FromBody] List<ReplayPostDto> input)
     {
         var service = new ReplaysService(this.config);
 
@@ -87,29 +57,35 @@ public class ReplaysController : Controller
         {
             try
             {
-                var result = await service.UploadReplay(replay);
+                var result = await service.UploadReplayNoEloDifference(replay);
 
-                if (result is string)
+                if (result.Item1 == 200)
+                {
+                    uploaded++;
+                    continue;
+                }
+
+                if (result.Item1 == 409)
                 {
                     duplicates++;
                     continue;
                 }
-                
-                // ReplayWithOldElo replayRes = (ReplayWithOldElo)result;
-                
-                uploaded++;
+
+                throw new Exception($"Failed to upload replay: {result.Item2}");
             }
             catch (Exception e)
             {
                 failed++;
+                Console.WriteLine($"Error while bulk uploading:\t {e.Message}");
             }
         }
-        
+
         return Ok(
-        new {
-            uploaded,
-            failed,
-            duplicates = 0
-        });
+            new
+            {
+                uploaded,
+                failed,
+                duplicates
+            });
     }
 }

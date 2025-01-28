@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 namespace SodbotAPI.DB.Models;
@@ -8,6 +9,7 @@ public class Player
     [Column("id")]
     public int Id { get; set; }
     [Column("discord_id")]
+    [MaxLength(20)] //max is probably 18?
     public string? DiscordId { get; set; }
     [Column("sd_elo")]
     public double? SdElo { get; set; }
