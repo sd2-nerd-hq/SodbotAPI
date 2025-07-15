@@ -83,6 +83,7 @@ public class ReplaysController : Controller
         return Ok(
             new
             {
+                message = "Bulk upload completed",
                 uploaded,
                 failed,
                 duplicates

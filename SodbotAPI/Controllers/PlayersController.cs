@@ -26,7 +26,10 @@ public class PlayersController : Controller
         var service = new PlayersService(this.config);
         List<Player> players = service.GetPlayers();
 
-        return Ok(players);
+        return Ok(new {
+            message = "Successfully retrieved players",
+            players
+        });
     }
 
     [HttpGet("{id:int}")]
@@ -41,7 +44,11 @@ public class PlayersController : Controller
             return NotFound(new { message = "Player not found" });
         }
 
-        return Ok(player);
+        return Ok(new
+        {
+            message = "Successfully retrieved player",
+            player
+        });
     }
 
     [HttpGet("aliases/{id:int}")]
@@ -56,7 +63,11 @@ public class PlayersController : Controller
             return NotFound(new { message = "Player not found" });
         }
         
-        return Ok(player);
+        return Ok(new
+        {
+            message = "Successfully retrieved player aliases",
+            player
+        });
     }
 
     [HttpGet("getPlayersByIds")]
@@ -65,7 +76,10 @@ public class PlayersController : Controller
         var service = new PlayersService(this.config);
         var players = service.GetPlayersByIds(ids);
 
-        return Ok(players);
+        return Ok(new {
+            message = "Successfully retrieved players",
+            players
+        });
     }
 
     [HttpGet("gamecount/{id:int}")]
@@ -80,7 +94,11 @@ public class PlayersController : Controller
             return NotFound(new { message = "Player not found" });
         }
 
-        return Ok(result);
+        return Ok(new
+        {
+            message = "Successfully retrieved player game count",
+            player = result
+        });
     }
     [HttpGet("rank")]
     public IActionResult GetPlayersWithRank(int? pageSize = null, int? pageNumber = null, string eloType = "SdElo")
@@ -96,13 +114,16 @@ public class PlayersController : Controller
 
         var result = service.GetPlayersWithRank(pageSize, pageNumber, eloProp);
 
-        return Ok(result);
+        return Ok(new
+        { 
+            message = "Successfully retrieved players with rank",
+            players = result
+        });
     }
     
     [HttpGet("rank/{id}")]
     public IActionResult GetSurroundingPlayersWithRank(string id,  string eloType = "SdElo")
     {
-        
         var service = new PlayersService(this.config);
 
         //check if ID is eugen ID or discord ID
@@ -140,7 +161,11 @@ public class PlayersController : Controller
             return NotFound(new { message = "Player doesn't have elo yet" });
         }
 
-        return Ok(result);
+        return Ok(new
+        {
+            message = "Successfully retrieved player and surrounding players",
+            player = result
+        });
     }
 
     [HttpPut("{id:int}")]
@@ -157,7 +182,11 @@ public class PlayersController : Controller
                 return BadRequest(new { message = "Player is already registered" });
             }
 
-            return Ok(result);
+            return Ok(new
+            {
+                message = "Successfully updated player",
+                player = result
+            });
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
         {

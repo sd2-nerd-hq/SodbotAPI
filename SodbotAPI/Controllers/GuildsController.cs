@@ -22,7 +22,11 @@ public class GuildsController : Controller
 
         var guilds = service.GetGuildsWithChannels();
 
-        return Ok(guilds);
+        return Ok(new
+        {
+            message = "Successfully retrieved guilds",
+            guilds
+        });
     }
     
     [HttpGet("{id}")]
@@ -37,7 +41,11 @@ public class GuildsController : Controller
             return NotFound(new {message = "Guild doesn't exist"});
         }
 
-        return Ok(guild);
+        return Ok(new
+        {
+            message = "Successfully retrieved guild",
+            guild
+        });
     }
     
     [HttpPost]
@@ -47,7 +55,11 @@ public class GuildsController : Controller
 
         var guild = service.AddGuild(input);
 
-        return Ok(guild!);
+        return Ok(new
+        {
+            message = "Successfully added guild",
+            guild
+        });
     }
     
     [HttpPut("{id}")]
@@ -62,7 +74,11 @@ public class GuildsController : Controller
             return NotFound(new {message ="Guild doesn't exist"});
         }
 
-        return Ok(guild);
+        return Ok(new
+        {
+            message = "Successfully updated guild",
+            guild
+        });
     }
     
     [HttpGet("channels/{id}")]
@@ -77,7 +93,10 @@ public class GuildsController : Controller
             return NotFound(new {message ="Channel doesn't exist."});
         }
 
-        return Ok(channel);
+        return Ok(new {
+            message = "Successfully retrieved channel",
+            channel
+        });
     }
     
     // [HttpPost("channels")]
@@ -107,7 +126,11 @@ public class GuildsController : Controller
             return NotFound(new {message = "Channel doesn't exist"});
         }
         
-        return Ok(channel);
+        return Ok(new
+        {
+            message = "Successfully added channel",
+            channel
+        });
     }
     
     [HttpPut("channels/{id}")]
@@ -122,6 +145,10 @@ public class GuildsController : Controller
             return NotFound(new {message = "Channel doesn't exist"});
         }
         
-        return Ok(channel);
+        return Ok(new
+        {
+            message = "Successfully updated channel",
+            channel
+        });
     }
 }

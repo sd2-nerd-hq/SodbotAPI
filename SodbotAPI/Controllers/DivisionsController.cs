@@ -21,7 +21,11 @@ public class DivisionsController : Controller
 
         var output = service.GetDivisions();
         
-        return Ok(output);
+        return Ok(new
+        {
+            message = "Successfully retrieved divisions",
+            output
+        });
     }
     
     [HttpPost]
@@ -31,6 +35,10 @@ public class DivisionsController : Controller
 
         var output = service.AddMissingDivisions(input);
 
-        return Ok(output);
+        return Ok(new
+        {
+            message = "Successfully added missing divisions",
+            output
+        });
     }
 }
