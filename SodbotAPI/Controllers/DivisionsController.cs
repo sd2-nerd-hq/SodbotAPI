@@ -8,7 +8,7 @@ namespace SodbotAPI.Controllers;
 [Route("[controller]")]
 public class DivisionsController : Controller
 {
-    private IConfiguration config;
+    private readonly IConfiguration config;
     public DivisionsController(IConfiguration config)
     {
         this.config = config;

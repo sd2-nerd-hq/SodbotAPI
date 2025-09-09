@@ -36,9 +36,9 @@ public class ReplaysService : SodbotService
         return replays;
     }
 
-    public Replay? GetReplay(int id)
+    public Task<Replay?> GetReplay(int id)
     {
-        return this.Context.Replays.Include(r => r.ReplayPlayers).FirstOrDefault(r => r.Id == id);
+        return this.Context.Replays.Include(r => r.ReplayPlayers).FirstOrDefaultAsync(r => r.Id == id);
     }
     
     public Replay? GetReplay(string sessionId)

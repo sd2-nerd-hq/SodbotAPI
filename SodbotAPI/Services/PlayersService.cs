@@ -16,24 +16,24 @@ public class PlayersService : SodbotService
         this.Context = new AppDbContext(config);
     }
 
-    public List<Player> GetPlayers()
+    public async Task<List<Player>> GetPlayers()
     {
-        return this.Context.Players.ToList();
+        return await this.Context.Players.ToListAsync();
     }
 
-    public Player? GetPlayer(int id)
+    public async Task<Player?> GetPlayer(int id)
     {
-        return this.Context.Players.Find(id);
+        return await this.Context.Players.FindAsync(id);
     }
 
-    public List<Player> GetPlayersByIds(int[] ids)
+    public async Task<List<Player>> GetPlayersByIds(int[] ids)
     {
-        return this.Context.Players.Where(p => ids.Contains(p.Id)).ToList();
+        return await this.Context.Players.Where(p => ids.Contains(p.Id)).ToListAsync();
     }
     
-    public Player? GetPlayerByDiscordId(string discordId)
+    public async Task<Player?> GetPlayerByDiscordId(string discordId)
     {
-        return this.Context.Players.FirstOrDefault(p => p.DiscordId == discordId);
+        return await this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == discordId);
     }
 
     private class PlayerElo
@@ -43,9 +43,9 @@ public class PlayersService : SodbotService
         public int GameCount { get; set; }
     }
 
-    public List<PlayerWithGameCount> GetReplayCountsByPlayerIds(int[] ids, Franchise franchise, bool isTeamGame)
+    public async Task<List<PlayerWithGameCount>> GetReplayCountsByPlayerIds(int[] ids, Franchise franchise, bool isTeamGame)
     {
-        return this.Context.Replays.Join(this.Context.ReplayPlayers,
+        return await this.Context.Replays.Join(this.Context.ReplayPlayers,
                 replay => replay.Id,
                 repPlay => repPlay.ReplayId,
                 (replay, repPlay) => new { replay, repPlay })
@@ -58,12 +58,12 @@ public class PlayersService : SodbotService
                     Id = pid,
                     GameCount = rid.Count()
                 }
-            ).ToList();
+            ).ToListAsync();
     }
     
-    public List<ReplayPlayerWithPlayer> UpdatePlayersEloUsingGameCount(List<ReplayPlayerWithPlayer> replayPlayers, Franchise franchise)
+    public async Task<List<ReplayPlayerWithPlayer>> UpdatePlayersEloUsingGameCount(List<ReplayPlayerWithPlayer> replayPlayers, Franchise franchise)
     {
-        var gameCounts = this.GetReplayCountsByPlayerIds(replayPlayers.Select(p => p.Player.Id).ToArray(),
+        var gameCounts = await this.GetReplayCountsByPlayerIds(replayPlayers.Select(p => p.Player.Id).ToArray(),
             franchise, replayPlayers.Count != 2);
 
 
@@ -237,7 +237,7 @@ public class PlayersService : SodbotService
         return player;
     }
 
-    public IEnumerable<PlayerWithRank>? GetPlayersWithRank(int? pageSize, int? pageNumber, PropertyInfo eloType)
+    public IEnumerable<PlayerWithRank> GetPlayersWithRank(int? pageSize, int? pageNumber, PropertyInfo eloType)
     {
         var parameter = Expression.Parameter(typeof(Player), "p");
         var property = Expression.Property(parameter, eloType);
@@ -309,9 +309,9 @@ public class PlayersService : SodbotService
 
         return rankedPlayers.Where(p => p.Rank >= lowerBound && p.Rank <= upperBound);
     }
-    public PlayerAliasesDto? GetPlayerWithAliases(int id)
+    public async Task<PlayerAliasesDto?> GetPlayerWithAliases(int id)
     {
-        var aliases = this.Context.ReplayPlayers.Where(rp => rp.PlayerId == id)
+        var aliases = await this.Context.ReplayPlayers.Where(rp => rp.PlayerId == id)
             .GroupBy(rp => rp.Nickname)
             .Select(e => new AliasWithCount()
             {
@@ -321,7 +321,7 @@ public class PlayersService : SodbotService
             .OrderByDescending(e => e.Count)
             .Take(5)
             .Select(E => E.Nickname)
-            .ToList();
+            .ToListAsync();
 
         if (aliases.Count == 0)
             return null;

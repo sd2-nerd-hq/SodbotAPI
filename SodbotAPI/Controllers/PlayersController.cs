@@ -21,10 +21,10 @@ public class PlayersController : Controller
     }
 
     [HttpGet]
-    public IActionResult GetPlayers()
+    public async Task<IActionResult> GetPlayers()
     {
         var service = new PlayersService(this.config);
-        List<Player> players = service.GetPlayers();
+        List<Player> players = await service.GetPlayers();
 
         return Ok(new {
             message = "Successfully retrieved players",
@@ -33,10 +33,10 @@ public class PlayersController : Controller
     }
 
     [HttpGet("{id:int}")]
-    public IActionResult GetPlayerById(int id)
+    public async Task<IActionResult> GetPlayerById(int id)
     {
         var service = new PlayersService(this.config);
-        var player = service.GetPlayer(id);
+        var player = await service.GetPlayer(id);
 
 
         if (player is null)
@@ -52,11 +52,11 @@ public class PlayersController : Controller
     }
 
     [HttpGet("aliases/{id:int}")]
-    public IActionResult GetPlayerAliasesById(int id)
+    public async Task<IActionResult> GetPlayerAliasesById(int id)
     {
         var service = new PlayersService(this.config);
         
-        var player = service.GetPlayerWithAliases(id);
+        var player = await service.GetPlayerWithAliases(id);
         
         if (player is null)
         {
@@ -71,10 +71,10 @@ public class PlayersController : Controller
     }
 
     [HttpGet("getPlayersByIds")]
-    public IActionResult GetPlayersByIds([FromQuery] int[] ids)
+    public async Task<IActionResult> GetPlayersByIds([FromQuery] int[] ids)
     {
         var service = new PlayersService(this.config);
-        var players = service.GetPlayersByIds(ids);
+        var players = await service.GetPlayersByIds(ids);
 
         return Ok(new {
             message = "Successfully retrieved players",
@@ -83,11 +83,11 @@ public class PlayersController : Controller
     }
 
     [HttpGet("gamecount/{id:int}")]
-    public IActionResult GetGameCount(int id)
+    public async Task<IActionResult> GetGameCount(int id)
     {
         var service = new PlayersService(this.config);
 
-        var result = service.GetPlayer(id);
+        var result = await service.GetPlayer(id);
 
         if (result is null)
         {
@@ -122,7 +122,7 @@ public class PlayersController : Controller
     }
     
     [HttpGet("rank/{id}")]
-    public IActionResult GetSurroundingPlayersWithRank(string id,  string eloType = "SdElo")
+    public async Task<IActionResult> GetSurroundingPlayersWithRank(string id,  string eloType = "SdElo")
     {
         var service = new PlayersService(this.config);
 
@@ -132,12 +132,12 @@ public class PlayersController : Controller
         string? message;
         if (id.Length <= 8)
         {
-            player = service.GetPlayer(Convert.ToInt32(id));
+            player = await service.GetPlayer(Convert.ToInt32(id));
             message = "Player not found";
         }
         else
         {
-            player =  service.GetPlayerByDiscordId(id);
+            player =  await service.GetPlayerByDiscordId(id);
             message = "Player with given Discord ID isn't registered";
             
         }
@@ -164,7 +164,7 @@ public class PlayersController : Controller
         return Ok(new
         {
             message = "Successfully retrieved player and surrounding players",
-            player = result
+            players = result
         });
     }
 

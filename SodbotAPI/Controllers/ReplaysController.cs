@@ -19,15 +19,39 @@ public class ReplaysController : Controller
     }
 
     [HttpGet]
-    public IActionResult Get()
+    public async Task<IActionResult> Get()
     {
         var service = new ReplaysService(this.config);
 
-        var replays = service.GetReplays();
-
-        return Ok(replays);
+        var replays = await service.GetReplays();
+        
+        return Ok(new
+        {
+            message = "Successfully retrieved replays",
+            replays
+        });
     }
-    
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> Get(int id)
+    {
+        var service = new ReplaysService(this.config);
+
+        var replay = await service.GetReplay(id);
+
+        if (replay is null)
+        {
+            return NotFound(new { message = "Replay not found" });
+        }
+        
+
+        return Ok(new
+        {
+            message = "Successfully retrieved replay",
+            replay
+        });
+    }
+
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] ReplayPostDto input)
     {
