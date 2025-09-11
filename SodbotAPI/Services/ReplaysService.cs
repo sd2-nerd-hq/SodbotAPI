@@ -24,26 +24,19 @@ public class ReplaysService : SodbotService
         return await this.Context.Replays.Include(r => r.ReplayPlayers).ToListAsync();
     }
 
-    public List<ReplayGetDto> GetReplaysWithPlayers()
+    public async Task<List<ReplayGetDto>> GetReplaysWithPlayers()
     {
-        List<ReplayGetDto> replays = this.Context.Replays.GroupJoin(this.Context.ReplayPlayers
+        return await this.Context.Replays.GroupJoin(this.Context.ReplayPlayers
                 .Join(this.Context.Players, rp => rp.PlayerId, p => p.Id, (rp, p) => new { rp, p }),
             r => r.Id, rp => rp.rp.PlayerId,
             (replay, rpTuple) =>
                 new ReplayGetDto(replay,
-                    rpTuple.Select(tup => new GetRpJoinedPlayer(tup.rp, tup.p)))).ToList();
-
-        return replays;
+                    rpTuple.Select(tup => new GetRpJoinedPlayer(tup.rp, tup.p)))).ToListAsync();
     }
 
     public Task<Replay?> GetReplay(int id)
     {
         return this.Context.Replays.Include(r => r.ReplayPlayers).FirstOrDefaultAsync(r => r.Id == id);
-    }
-    
-    public Replay? GetReplay(string sessionId)
-    {
-        return this.Context.Replays.Include(r => r.ReplayPlayers).FirstOrDefault(r => r.SessionId == sessionId);
     }
 
     public async Task<Tuple<int, string?>> UploadReplayNoEloDifference(ReplayPostDto input)
@@ -167,6 +160,65 @@ public class ReplaysService : SodbotService
 
         return true;
     }
+
+    public async Task<Replay?> UploadReplayBansReport(ReplayBansReport report)
+    {
+       var replaysWithJoinedPlayers = await this.Context.Replays
+            .Where(r => r.UploadedIn == report.ChannelId 
+                        && r.UploadedAt <= DateTime.Now.AddDays(-7)
+                        && r.IsTeamGame == false
+                        && this.Context.DivisionBans.Any(db => db.ReplayId == r.Id))
+           .GroupJoin(this.Context.ReplayPlayers
+                .Join(this.Context.Players, rp => rp.PlayerId, p => p.Id, (rp, p) => new { rp, p }),
+            r => r.Id, rp => rp.rp.PlayerId,
+            (replay, rpWithPlayer) =>
+                new ReplayGetDto(replay,
+                    rpWithPlayer.Select(tup => new GetRpJoinedPlayer(tup.rp, tup.p)))).ToListAsync();
+       
+
+        for(int i = 0; i < report.Host.DivPicks.Count; i++)
+        {
+            string? map = report.Host.MapPicks.FirstOrDefault(m => m.Order == i)?.Pick;
+            map ??= report.Guest.MapPicks.FirstOrDefault(m => m.Order == i)?.Pick;
+
+            if (map is null)
+            {
+                throw new ArgumentException("Map pick for order " + i + " not found");
+            }
+
+            var target = replaysWithJoinedPlayers.Where(r =>
+                (r.ReplayPlayers[0].DiscordId == report.Host.DiscordId
+                 && r.ReplayPlayers[0].Division == report.Host.DivPicks[i].Pick
+                 && r.ReplayPlayers[1].DiscordId == report.Guest.DiscordId
+                 && r.ReplayPlayers[1].Division == report.Guest.DivPicks[i].Pick)
+                ||
+
+                (r.ReplayPlayers[1].DiscordId == report.Host.DiscordId
+                 && r.ReplayPlayers[1].Division == report.Host.DivPicks[i].Pick
+                 && r.ReplayPlayers[0].DiscordId == report.Guest.DiscordId
+                 && r.ReplayPlayers[0].Division == report.Guest.DivPicks[i].Pick)
+                && r.Map == map
+            );
+
+            int count = target.Count();
+            
+            if(count == 0)
+            {
+                return null;
+            }
+            
+            ReplayGetDto replay = target.First();
+
+            if (count > 1)
+            {
+                replay = target.OrderByDescending(r => r.UploadedAt).First();
+            }
+            
+            Replay replay = 
+
+        }
+        
+    } 
 
     public async Task<int> SaveChangesAsync() => await this.Context.SaveChangesAsync();
 

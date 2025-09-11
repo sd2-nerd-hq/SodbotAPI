@@ -17,5 +17,5 @@ public class ReplayGetDto(Replay r, IEnumerable<GetRpJoinedPlayer> joinedPlayers
     public VictoryCondition VictoryCondition { get; set; } = r.VictoryCondition;
     public int DurationSec { get; set; } = r.DurationSec;
     public SkillLevel SkillLevel { get; set; } = r.SkillLevel;
-    public IEnumerable<GetRpJoinedPlayer> ReplayPlayers { get; set; } = joinedPlayers;
+    public List<GetRpJoinedPlayer> ReplayPlayers { get; set; } = joinedPlayers.ToList();
 }

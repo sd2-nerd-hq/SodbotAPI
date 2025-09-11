@@ -35,6 +35,9 @@ public class ReplayPlayer
     
     [Column("deck_code")]
     public string DeckCode { get; set; }
+
+    public List<DivisionBan> DivisionBans { get; set; } = new();
+    public List<MapBan> MapBans { get; set; } = new();
 }
 
 public enum Income

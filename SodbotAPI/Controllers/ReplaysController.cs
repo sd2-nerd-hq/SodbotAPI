@@ -113,4 +113,32 @@ public class ReplaysController : Controller
                 duplicates
             });
     }
+
+    [HttpPut("bans")]
+    public async Task<IActionResult> Put([FromBody] ReplayPostDto input)
+    {
+        var service = new ReplaysService(this.config);
+
+        
+
+        return Ok();
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -14,6 +14,8 @@ public class AppDbContext : DbContext
     public DbSet<Replay> Replays { get; set; }
     public DbSet<Player> Players { get; set; }
     public DbSet<ReplayPlayer> ReplayPlayers { get; set; }
+    public DbSet<DivisionBan> DivisionBans { get; set; }
+    public DbSet<MapBan> MapBans { get; set; }    
     public DbSet<Division> Divisions { get; set; }
     public DbSet<Guild> Guilds { get; set; }
     public DbSet<Channel> Channels { get; set; }
@@ -32,10 +34,23 @@ public class AppDbContext : DbContext
         
         modelBuilder.HasPostgresEnum<Income>();
 
+
         modelBuilder.Entity<ReplayPlayer>(e =>
         {
             e.Property(p => p.Income).HasColumnType("Income");
         });
+
+        modelBuilder.Entity<ReplayPlayer>()
+            .HasMany(rp => rp.DivisionBans)
+            .WithOne()
+            .HasForeignKey(divBan => new { divBan.PlayerId, divBan.ReplayId });
+        
+        modelBuilder.Entity<ReplayPlayer>()
+            .HasMany(rp => rp.MapBans)
+            .WithOne()
+            .HasForeignKey(mapBan => new { mapBan.PlayerId, mapBan.ReplayId });
+        
+        
         
         modelBuilder.Entity<Replay>(e =>
         {
