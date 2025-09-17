@@ -51,7 +51,6 @@ public class PlayersController : Controller
         });
     }
     
-    
     [HttpGet("byDiscordId/{id}")]
     public async Task<IActionResult> GetPlayerById(string id)
     {
@@ -67,6 +66,36 @@ public class PlayersController : Controller
         return Ok(new
         {
             message = "Successfully retrieved player",
+            player
+        });
+    }
+    [HttpGet("guessPlayerFromDiscordId/{discordId}")]
+    public async Task<IActionResult> GuessEugenId(string discordId)
+    {
+        var service = new PlayersService(this.config);
+        var player = await service.GetPlayerByDiscordId(discordId);
+
+        if (player is not null)
+        {
+            return StatusCode(208, new
+            {
+                message = "Player already registered.",
+                player
+            });
+        }
+
+        var playerId = await service.GuessPlayersIdFromUploads(discordId);
+
+        if (playerId <= 0)
+        {
+            return NotFound(new { message = "Results inconclusive." });
+        }
+        
+        player = await service.GetPlayer(playerId);
+
+        return Ok(new
+        {
+            message = "Successfully guessed player",
             player
         });
     }
@@ -116,7 +145,7 @@ public class PlayersController : Controller
 
         return Ok(new
         {
-            message = "Successfully retrieved player game count",
+            message = "Successfully retrieved player's game count",
             player = result
         });
     }

@@ -247,12 +247,12 @@ public class PlayersService : SodbotService
         var parameter = Expression.Parameter(typeof(Player), "p");
         var property = Expression.Property(parameter, eloType);
         var notNullCheck = Expression.NotEqual(property, Expression.Constant(null));
-        var labdaFunc = Expression.Lambda<Func<Player, bool>>(notNullCheck, parameter);
+        var lambdaFunc = Expression.Lambda<Func<Player, bool>>(notNullCheck, parameter);
 
         var orderBy = Expression.Lambda(property, parameter);
         
         IQueryable<Player> query = this.Context.Players
-            .Where(labdaFunc);
+            .Where(lambdaFunc);
 
         query = ApplyOrderByDescending(query, orderBy);
         
@@ -338,7 +338,7 @@ public class PlayersService : SodbotService
     {
         var count = this.Context.Replays.Count(r => r.UploadedBy == discordId);
 
-        if (count < 10)
+        if (count < 5)
         {
             return -1;
         }
@@ -349,7 +349,7 @@ public class PlayersService : SodbotService
 
 
         double ratioHighest = highestId.ReplayCount / Convert.ToDouble(count);
-
+        
         if (idList.Count < 2)
         {
             //should never happen since replays including AI are not uploaded, but just in case
@@ -357,16 +357,17 @@ public class PlayersService : SodbotService
         }
 
         var secondHighestId = idList[1];
-
+        
+        if (ratioHighest < 0.75 && count <= 10)
+        {
+            return -4;
+        }
+        
         if (ratioHighest < secondHighestId.ReplayCount / Convert.ToDouble(count) + 0.3)
         {
             return -3;
         }
 
-        if (ratioHighest < 0.75)
-        {
-            return -4;
-        }
 
         return highestId.PlayerId;
     }

@@ -119,7 +119,19 @@ public class ReplaysController : Controller
     {
         var service = new ReplaysService(this.config);
 
-        var res = await service.UploadReplayBansReport(report);
+        Tuple<int, List<Replay>?> res;
+        try
+        {
+            res = await service.UploadReplayBansReport(report);
+        }
+        catch (DbUpdateException dbEx)
+        {
+            Console.WriteLine(dbEx.Message);
+            return StatusCode(500, new
+            {
+                message = "Unexpected error. Couldn't upload bans report."
+            });
+        }
 
         if (res.Item1 == 1)
         {

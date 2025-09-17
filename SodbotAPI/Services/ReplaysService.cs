@@ -178,45 +178,51 @@ public class ReplaysService : SodbotService
 
         var hostTask= this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == report.Host.DiscordId);
         var guestTask= this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == report.Guest.DiscordId);
-        
-      
-       var queryTask = this.Context.Replays
-           .Include(r => r.ReplayPlayers)
-            .Where(r => r.UploadedIn == report.ChannelId 
-                        && r.UploadedAt <= DateTime.Now.AddDays(-7)
+
+        var query = this.Context.Replays
+            .Include(r => r.ReplayPlayers)
+            .Where(r => r.UploadedIn == report.ChannelId
                         && r.IsTeamGame == false
-                        && this.Context.DivisionBans.Any(db => db.ReplayId == r.Id))
-           .ToListAsync(); 
+                        && this.Context.DivisionBans.Any(db => db.ReplayId == r.Id));
+
+       if (!report.PersistentSearch)
+       {
+           query = query.Where(r => r.UploadedAt <= DateTime.Now.AddDays(-7));
+       }
+       
+        var queryTask = query.ToListAsync();
        
        var host = await hostTask;
        var guest = await guestTask;
 
        if (host is null)
-       {
+       { 
+           //host not registered
            return new (1, null);
        }
 
        if (guest is null)
        {
+           //guest not registered
            return new(2, null);
        }
 
-       //create models that will be uploaded to the DB
-       List<DivisionBan> divBans = new();
-       List<MapBan> mapBans = new();
-       
-       report.Host.DivBans.ForEach(db => divBans.Add(new DivisionBan(host.Id, 0, db)));
-       report.Guest.DivBans.ForEach(db => divBans.Add(new DivisionBan(guest.Id, 0, db)));
-       
-       report.Host.MapBans.ForEach(mb => mapBans.Add(new MapBan(host.Id, 0, mb)));
-       report.Guest.MapBans.ForEach(mb => mapBans.Add(new MapBan(guest.Id, 0, mb)));
-       
        
        var replays = await queryTask;
        List<Replay> results = new();
+
+       //if even then all games are played (draws allowed)
+       //if odd then half + 1 games are played (played until one player has majority wins)
+       int winMajority = report.Host.DivPicks.Count % 2 == 0
+           ? report.Host.DivPicks.Count
+           : report.Host.DivPicks.Count / 2 + 1;
+       
+        int hostWins = 0;
+        int guestWins = 0;
        
         //iterates through the picks
-        for(int i = 0; i < report.Host.DivPicks.Count; i++)
+        int i = 0;
+        while(hostWins < winMajority && guestWins < winMajority && hostWins + guestWins < report.Host.DivPicks.Count)
         {
             string? map = report.Host.MapPicks.FirstOrDefault(m => m.Order == i)?.Pick;
             map ??= report.Guest.MapPicks.FirstOrDefault(m => m.Order == i)?.Pick;
@@ -242,10 +248,11 @@ public class ReplaysService : SodbotService
             
             if(target.Count == 0)
             {
+                //No replay found for this pick, possibly not uploaded yet
                 return new(3, null);
             }
             
-            Replay replay = target.First();
+            var replay = target.First();
 
             //if it finds more than one select the newest one
             //possibly sketchy? if persistant search is used (I guess the user knows why he's doing it... (trusting the user, what could go wrong?)
@@ -255,21 +262,83 @@ public class ReplaysService : SodbotService
                 replay = target.OrderByDescending(r => r.UploadedAt).First();
             }
             
-            divBans.ForEach(db => db.ReplayId = replay.Id);
-            mapBans.ForEach(mb => mb.ReplayId = replay.Id);
-            
             //now add the picks and bans to db 
-            this.Context.DivisionBans.AddRange(divBans);
-            this.Context.MapBans.AddRange(mapBans);
+            this.Context.DivisionBans.AddRange(this.CreateDivBanModels(host.Id, replay.Id, report.Host));
+            this.Context.DivisionBans.AddRange(this.CreateDivBanModels(guest.Id, replay.Id, report.Guest));
+            this.Context.MapBans.AddRange(this.CreateMapBanModels(host.Id, replay.Id, report.Host));
+            this.Context.MapBans.AddRange(this.CreateMapBanModels(guest.Id, replay.Id, report.Guest));
             
             results.Add(replay);
+
+            if (replay.ReplayPlayers.First(rp => rp.PlayerId == host.Id).Victory)
+                hostWins++;
+            else
+                guestWins++;
+
+            i++;
+        }
+
+        try
+        {
+            await this.Context.SaveChangesAsync();
+        }
+        catch(Exception ex)
+        {
+            throw new DbUpdateException(ex.Message);
         }
         
-        await this.Context.SaveChangesAsync();
-        
         return new (0, results);
-    } 
+    }
+    
+    private IEnumerable<DivisionBan> CreateDivBanModels(int playerId, int replayId, ReplayBansReportPlayer bans) =>
+        bans.DivBans.Select(db => new DivisionBan(playerId, replayId, db));
 
+    private IEnumerable<MapBan> CreateMapBanModels(int playerId, int replayId, ReplayBansReportPlayer bans) =>
+        bans.MapBans.Select(db => new MapBan(playerId, replayId, db));
+
+    /// <summary>
+    /// Checks the integrity of the data
+    /// </summary>
+    /// <returns>Returns list of issues (everything okay when empty list is returned.</returns>
+    public List<string> CheckDataIntegrity(ReplayBansReport report)
+    {
+        //is it okay if players don't have the same amount of bans? guess so...
+        
+        List<string> issues = new();
+
+        if (report.Host.DivPicks.Count <= 0)
+        {
+            issues.Add("Host has no division picks");
+        }
+        if (report.Guest.DivPicks.Count <= 0)
+        {
+            issues.Add("Guest has no division picks");
+        }
+        
+        if (report.Host.MapPicks.Count <= 0)
+        {
+            issues.Add("Host has no map picks");
+        }
+
+        if (issues.Count > 0)
+        {
+            return issues;
+        }
+        
+        int gamesCount = report.Host.DivPicks.Count;
+        
+        if (report.Guest.DivPicks.Count != gamesCount)
+        {
+            issues.Add("Guest has different amount of division picks");
+        }
+        if (report.Host.MapPicks.Count + report.Guest.MapPicks.Count != gamesCount)
+        {
+            issues.Add("Number of maps picked has to be equal to number of divisions picked");
+        }
+        
+        
+        return issues;
+    }
     public async Task<int> SaveChangesAsync() => await this.Context.SaveChangesAsync();
 
     public static PropertyInfo GetEloProperty(int playerCount, Franchise franchise)
