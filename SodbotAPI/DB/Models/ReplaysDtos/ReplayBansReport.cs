@@ -24,7 +24,7 @@ public class ReplayBansReport
 public class ReplayBansReportPlayer
 {
     public string DiscordId { get; set; }
-    public List<string> DivBans { get; set; }
+    public List<int> DivBans { get; set; }
     public List<string> MapBans { get; set; }
     public List<DivPickWithOrder> DivPicks { get; set; }
     public List<MapPickWithOrder> MapPicks { get; set; }

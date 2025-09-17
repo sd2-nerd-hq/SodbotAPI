@@ -50,6 +50,26 @@ public class PlayersController : Controller
             player
         });
     }
+    
+    
+    [HttpGet("byDiscordId/{id}")]
+    public async Task<IActionResult> GetPlayerById(string id)
+    {
+        var service = new PlayersService(this.config);
+        var player = await service.GetPlayer(id);
+
+
+        if (player is null)
+        {
+            return NotFound(new { message = "Player not found" });
+        }
+
+        return Ok(new
+        {
+            message = "Successfully retrieved player",
+            player
+        });
+    }
 
     [HttpGet("aliases/{id:int}")]
     public async Task<IActionResult> GetPlayerAliasesById(int id)
@@ -102,7 +122,7 @@ public class PlayersController : Controller
     }
     [HttpGet("rank")]
     public IActionResult GetPlayersWithRank(int? pageSize = null, int? pageNumber = null, string eloType = "SdElo")
-    {
+   {
         var service = new PlayersService(this.config);
         
         var eloProp = ReplaysService.GetEloProperty(eloType);

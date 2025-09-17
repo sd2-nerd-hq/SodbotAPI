@@ -26,6 +26,11 @@ public class PlayersService : SodbotService
         return await this.Context.Players.FindAsync(id);
     }
 
+    public async Task<Player?> GetPlayer(string discordId)
+    {
+        return await this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == discordId);
+    }
+
     public async Task<List<Player>> GetPlayersByIds(int[] ids)
     {
         return await this.Context.Players.Where(p => ids.Contains(p.Id)).ToListAsync();
@@ -127,7 +132,7 @@ public class PlayersService : SodbotService
                 k += 120 - player.GameCount * 12;
             }
             
-            double elo = player.RPWithPlayer.UploadReplayPlayerPost.SodbotElo;
+            var elo = player.RPWithPlayer.UploadReplayPlayerPost.SodbotElo;
             
             player.RPWithPlayer.UploadReplayPlayerPost.OldSodbotElo = elo;
             
@@ -160,7 +165,7 @@ public class PlayersService : SodbotService
                 return players;
             }
             
-            double avgWinElo = ps.Average(p => this.GetEloFromPlayer(p.Player, eloProp)!);
+            var avgWinElo = ps.Average(p => this.GetEloFromPlayer(p.Player, eloProp)!);
 
             ps = players.Where(p => !p.UploadReplayPlayerPost.Victory).ToList();
         
@@ -169,10 +174,10 @@ public class PlayersService : SodbotService
                 return players;
             }
             
-            double avgLosElo = ps.Average(p => this.GetEloFromPlayer(p.Player, eloProp)!);
+            var avgLosElo = ps.Average(p => this.GetEloFromPlayer(p.Player, eloProp)!);
         
 
-            double expectedScoreForWinners = this.GetExpectedScore(avgWinElo, avgLosElo);
+            var expectedScoreForWinners = this.GetExpectedScore(avgWinElo, avgLosElo);
 
             foreach (var player in players)
             {
@@ -211,7 +216,7 @@ public class PlayersService : SodbotService
 
     public Player? UpdatePlayerDiscordId(int id, PlayerPutDto input)
     {
-        var player = this.Context.Players.Find(id);
+                var player = this.Context.Players.Find(id);
 
         if (player is null)
         {
@@ -291,11 +296,6 @@ public class PlayersService : SodbotService
     public IEnumerable<PlayerWithRank>? GetPlayerAndSurroundingPlayersRank(int targetId, PropertyInfo eloType)
     {
         var rankedPlayers = this.GetPlayersWithRank(null, null, eloType);
-        
-        if (rankedPlayers is null)
-        {
-            return null;
-        }
 
         var player = rankedPlayers.FirstOrDefault(p => p.Id == targetId);
         
@@ -320,7 +320,7 @@ public class PlayersService : SodbotService
             })
             .OrderByDescending(e => e.Count)
             .Take(5)
-            .Select(E => E.Nickname)
+            .Select(e => e.Nickname)
             .ToListAsync();
 
         if (aliases.Count == 0)
@@ -332,12 +332,71 @@ public class PlayersService : SodbotService
             Aliases = aliases
         };
     }
+    
+    
+    public async Task<int> GuessPlayersIdFromUploads(string discordId)
+    {
+        var count = this.Context.Replays.Count(r => r.UploadedBy == discordId);
 
+        if (count < 10)
+        {
+            return -1;
+        }
+
+        var idList = await this.GetPlayersListFromDiscordUserUploadsOrderDesc(discordId);
+
+        var highestId = idList.First();
+
+
+        double ratioHighest = highestId.ReplayCount / Convert.ToDouble(count);
+
+        if (idList.Count < 2)
+        {
+            //should never happen since replays including AI are not uploaded, but just in case
+            return -2;
+        }
+
+        var secondHighestId = idList[1];
+
+        if (ratioHighest < secondHighestId.ReplayCount / Convert.ToDouble(count) + 0.3)
+        {
+            return -3;
+        }
+
+        if (ratioHighest < 0.75)
+        {
+            return -4;
+        }
+
+        return highestId.PlayerId;
+    }
+    
+    private async Task<List<PlayerIdWithReplayCount>> GetPlayersListFromDiscordUserUploadsOrderDesc(string discordId)
+    {
+        return await this.Context.Replays
+            .Where(r => r.UploadedBy == discordId)
+            .Join(this.Context.ReplayPlayers,
+                r => r.Id,
+                rp => rp.ReplayId,
+                (r, rp) => new { r, rp })
+            .Join(this.Context.Players,
+                rr => rr.rp.PlayerId,
+                p => p.Id,
+                (rr, p) => new { rr.rp, p })
+            .GroupBy(x => x.rp.PlayerId)
+            .Select(g => new PlayerIdWithReplayCount()
+            {
+                PlayerId = g.Key,
+                ReplayCount = g.Count()
+            })
+            .OrderByDescending(r => r.ReplayCount)
+            .ToListAsync();
+    }
+
+    
     private class AliasWithCount
     {
         public string Nickname { get; set; }
         public int Count { get; set; }
     }
-    
-    
 }

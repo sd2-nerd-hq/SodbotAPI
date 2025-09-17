@@ -114,14 +114,44 @@ public class ReplaysController : Controller
             });
     }
 
-    [HttpPut("bans")]
-    public async Task<IActionResult> Put([FromBody] ReplayPostDto input)
+    [HttpPost("bans")]
+    public async Task<IActionResult> Post([FromBody] ReplayBansReport report)
     {
         var service = new ReplaysService(this.config);
 
-        
+        var res = await service.UploadReplayBansReport(report);
 
-        return Ok();
+        if (res.Item1 == 1)
+        {
+            return NotFound(new
+            {
+                message = "Host not registered to sodbot."
+            });
+        }
+
+        if (res.Item1 == 2)
+        {
+            return NotFound(new
+            {
+                message = "Guest not registered to sodbot."
+            });
+        }
+
+        if (res.Item1 == 3)
+        {
+            return NotFound(new
+            {
+                message =
+                    "Replays corresponding to the report not found. Make sure you are uploading the report after both replays are submitted" +
+                    " and in the same channel as they were submitted."
+            });
+        }
+        
+        return Ok(new
+        {
+            message = "Successfully uploaded report.",
+            replays = res.Item2
+        });
     }
 }
 

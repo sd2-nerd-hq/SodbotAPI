@@ -117,15 +117,24 @@ public class ReplaysService : SodbotService
         
         //create replay model and upload it (replayPlayers are included in ctor)
         Replay replay = new(input);
-        this.Context.Replays.Add(replay);
-        
-        int status = await SaveChangesCheckConflict() ? 200 : 409;
-        
-        // this.Context.ReplayPlayers.AddRange(rps);
 
+        var ret = this.Context.Replays.Add(replay);
+        
+        int status = await SaveChangesCheckConflict() ? 0 : 1;
+        
+        //when uploaded again in a different tournament channel resubmit the replay (was probably a mistake)
+        if (input.SkillLevel != SkillLevel.others)
+        {
+            
+            //if it got uploaded in a tournament channel before don't alter elo anymore (to avoid multiple ELO changes)
+            if (status == 1 && ret.Entity.SkillLevel == SkillLevel.others)
+            {
+                
+            }
+        }
         
         //for "others" SL ELO isn't updated
-        if (input.SkillLevel == SkillLevel.others || status == 409)
+        if (input.SkillLevel == SkillLevel.others || status == 1)
         {
             List<UploadReplayPlayerResponse> uploadRp =
                 rpJoinedPlayers.Select(rp => rp.UploadReplayPlayerPost).ToList();
@@ -161,21 +170,52 @@ public class ReplaysService : SodbotService
         return true;
     }
 
-    public async Task<Replay?> UploadReplayBansReport(ReplayBansReport report)
+    //used to upload finished pick asd bans session done on aoe2 website
+    //to make things simpler and avoid remembering a message ID in replay database
+    //it guesses the replay based on the pick data (divs and map) and the players in the game
+    public async Task<Tuple<int, List<Replay>?>> UploadReplayBansReport(ReplayBansReport report)
     {
-       var replaysWithJoinedPlayers = await this.Context.Replays
+
+        var hostTask= this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == report.Host.DiscordId);
+        var guestTask= this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == report.Guest.DiscordId);
+        
+      
+       var queryTask = this.Context.Replays
+           .Include(r => r.ReplayPlayers)
             .Where(r => r.UploadedIn == report.ChannelId 
                         && r.UploadedAt <= DateTime.Now.AddDays(-7)
                         && r.IsTeamGame == false
                         && this.Context.DivisionBans.Any(db => db.ReplayId == r.Id))
-           .GroupJoin(this.Context.ReplayPlayers
-                .Join(this.Context.Players, rp => rp.PlayerId, p => p.Id, (rp, p) => new { rp, p }),
-            r => r.Id, rp => rp.rp.PlayerId,
-            (replay, rpWithPlayer) =>
-                new ReplayGetDto(replay,
-                    rpWithPlayer.Select(tup => new GetRpJoinedPlayer(tup.rp, tup.p)))).ToListAsync();
+           .ToListAsync(); 
        
+       var host = await hostTask;
+       var guest = await guestTask;
 
+       if (host is null)
+       {
+           return new (1, null);
+       }
+
+       if (guest is null)
+       {
+           return new(2, null);
+       }
+
+       //create models that will be uploaded to the DB
+       List<DivisionBan> divBans = new();
+       List<MapBan> mapBans = new();
+       
+       report.Host.DivBans.ForEach(db => divBans.Add(new DivisionBan(host.Id, 0, db)));
+       report.Guest.DivBans.ForEach(db => divBans.Add(new DivisionBan(guest.Id, 0, db)));
+       
+       report.Host.MapBans.ForEach(mb => mapBans.Add(new MapBan(host.Id, 0, mb)));
+       report.Guest.MapBans.ForEach(mb => mapBans.Add(new MapBan(guest.Id, 0, mb)));
+       
+       
+       var replays = await queryTask;
+       List<Replay> results = new();
+       
+        //iterates through the picks
         for(int i = 0; i < report.Host.DivPicks.Count; i++)
         {
             string? map = report.Host.MapPicks.FirstOrDefault(m => m.Order == i)?.Pick;
@@ -186,38 +226,48 @@ public class ReplaysService : SodbotService
                 throw new ArgumentException("Map pick for order " + i + " not found");
             }
 
-            var target = replaysWithJoinedPlayers.Where(r =>
-                (r.ReplayPlayers[0].DiscordId == report.Host.DiscordId
+            //finds the replays corresponding to the reports
+            var target = replays.Where(r =>
+                r.Map == map &&
+                (r.ReplayPlayers[0].PlayerId == host.Id
                  && r.ReplayPlayers[0].Division == report.Host.DivPicks[i].Pick
-                 && r.ReplayPlayers[1].DiscordId == report.Guest.DiscordId
+                 && r.ReplayPlayers[1].PlayerId == guest.Id
                  && r.ReplayPlayers[1].Division == report.Guest.DivPicks[i].Pick)
                 ||
-
-                (r.ReplayPlayers[1].DiscordId == report.Host.DiscordId
+                (r.ReplayPlayers[1].PlayerId == host.Id 
                  && r.ReplayPlayers[1].Division == report.Host.DivPicks[i].Pick
-                 && r.ReplayPlayers[0].DiscordId == report.Guest.DiscordId
+                 && r.ReplayPlayers[0].PlayerId == guest.Id
                  && r.ReplayPlayers[0].Division == report.Guest.DivPicks[i].Pick)
-                && r.Map == map
-            );
-
-            int count = target.Count();
+            ).ToList();
             
-            if(count == 0)
+            if(target.Count == 0)
             {
-                return null;
+                return new(3, null);
             }
             
-            ReplayGetDto replay = target.First();
+            Replay replay = target.First();
 
-            if (count > 1)
+            //if it finds more than one select the newest one
+            //possibly sketchy? if persistant search is used (I guess the user knows why he's doing it... (trusting the user, what could go wrong?)
+            //maybe check if the other one was played somewhat close to this one then?
+            if (target.Count > 1)
             {
                 replay = target.OrderByDescending(r => r.UploadedAt).First();
             }
             
-            Replay replay = 
-
+            divBans.ForEach(db => db.ReplayId = replay.Id);
+            mapBans.ForEach(mb => mb.ReplayId = replay.Id);
+            
+            //now add the picks and bans to db 
+            this.Context.DivisionBans.AddRange(divBans);
+            this.Context.MapBans.AddRange(mapBans);
+            
+            results.Add(replay);
         }
         
+        await this.Context.SaveChangesAsync();
+        
+        return new (0, results);
     } 
 
     public async Task<int> SaveChangesAsync() => await this.Context.SaveChangesAsync();
