@@ -115,26 +115,47 @@ public class ReplaysService : SodbotService
             input.SkillLevel = channel?.SkillLevel ?? SkillLevel.others;
         }
         
+        
+        
         //create replay model and upload it (replayPlayers are included in ctor)
         Replay replay = new(input);
-
-        var ret = this.Context.Replays.Add(replay);
         
-        int status = await SaveChangesCheckConflict() ? 0 : 1;
+        var existing = await this.Context.Replays.FirstOrDefaultAsync(r => replay.SessionId == r.SessionId);
+        int status = 0;
         
         //when uploaded again in a different tournament channel resubmit the replay (was probably a mistake)
-        if (input.SkillLevel != SkillLevel.others)
+        if (existing is not null)
         {
-            
+            status = 1;
             //if it got uploaded in a tournament channel before don't alter elo anymore (to avoid multiple ELO changes)
-            if (status == 1 && ret.Entity.SkillLevel == SkillLevel.others)
+            if (existing.SkillLevel == SkillLevel.others && replay.SkillLevel != SkillLevel.others)
             {
-                
+                var pService = new PlayersService(this.config);
+                await pService.UpdatePlayersElo(rpJoinedPlayers, input.Franchise);
+                status = 2;
             }
+
+            if (replay.SkillLevel == SkillLevel.others)
+            {
+                return new Tuple<int, UploadReplayResponse>(3, new UploadReplayResponse(existing, 
+                    rpJoinedPlayers.Select(rp => rp.UploadReplayPlayerPost).ToList()));
+            }
+            
+            existing.UploadedIn = replay.UploadedIn;
+            existing.UploadedBy = replay.UploadedBy;
+            existing.UploadedAt = replay.UploadedAt;
+            existing.SkillLevel = replay.SkillLevel;
+            
+            await this.Context.SaveChangesAsync();
+            return new Tuple<int, UploadReplayResponse>(status, new UploadReplayResponse(existing, 
+                rpJoinedPlayers.Select(rp => rp.UploadReplayPlayerPost).ToList()));
         }
+
+        this.Context.Replays.Add(replay);
+        await this.Context.SaveChangesAsync();
         
-        //for "others" SL ELO isn't updated
-        if (input.SkillLevel == SkillLevel.others || status == 1)
+        //for "others" Skill level ELO isn't updated
+        if (input.SkillLevel == SkillLevel.others)
         {
             List<UploadReplayPlayerResponse> uploadRp =
                 rpJoinedPlayers.Select(rp => rp.UploadReplayPlayerPost).ToList();
@@ -145,11 +166,9 @@ public class ReplaysService : SodbotService
         //update Elo
         var playerService = new PlayersService(this.config);
         await playerService.UpdatePlayersElo(rpJoinedPlayers, input.Franchise);
-        
-        List<UploadReplayPlayerResponse> outputRp =
-            rpJoinedPlayers.Select(rp => rp.UploadReplayPlayerPost).ToList();
-        
-        return new Tuple<int, UploadReplayResponse>(status, new UploadReplayResponse(replay, outputRp));
+
+        return new Tuple<int, UploadReplayResponse>(0, new UploadReplayResponse(replay,
+        rpJoinedPlayers.Select(rp => rp.UploadReplayPlayerPost).ToList()));
     }
 
     /// <summary>
@@ -175,25 +194,31 @@ public class ReplaysService : SodbotService
     //it guesses the replay based on the pick data (divs and map) and the players in the game
     public async Task<Tuple<int, List<Replay>?>> UploadReplayBansReport(ReplayBansReport report)
     {
+        var problems = this.CheckDataIntegrity(report);
 
-        var hostTask= this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == report.Host.DiscordId);
-        var guestTask= this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == report.Guest.DiscordId);
-
-        var query = this.Context.Replays
+        if (problems.Count > 0)
+        {
+            return new (4, null);
+        }
+        
+        var date = DateTime.UtcNow.AddDays(-7);
+        var query = await this.Context.Replays
             .Include(r => r.ReplayPlayers)
             .Where(r => r.UploadedIn == report.ChannelId
                         && r.IsTeamGame == false
-                        && this.Context.DivisionBans.Any(db => db.ReplayId == r.Id));
+                        && !this.Context.DivisionBans.Any(db => db.ReplayId == r.Id)
+                        && r.UploadedAt >= date
+                        ).ToListAsync();
 
+       /*
        if (!report.PersistentSearch)
        {
            query = query.Where(r => r.UploadedAt <= DateTime.Now.AddDays(-7));
        }
-       
-        var queryTask = query.ToListAsync();
-       
-       var host = await hostTask;
-       var guest = await guestTask;
+       */
+
+       var host = await this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == report.Host.DiscordId);
+       var guest = await this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == report.Guest.DiscordId);
 
        if (host is null)
        { 
@@ -207,8 +232,8 @@ public class ReplaysService : SodbotService
            return new(2, null);
        }
 
-       
-       var replays = await queryTask;
+       var replays = query;
+       //var replays = await query.ToListAsync();
        List<Replay> results = new();
 
        //if even then all games are played (draws allowed)
@@ -339,7 +364,6 @@ public class ReplaysService : SodbotService
         
         return issues;
     }
-    public async Task<int> SaveChangesAsync() => await this.Context.SaveChangesAsync();
 
     public static PropertyInfo GetEloProperty(int playerCount, Franchise franchise)
     {

@@ -24,7 +24,7 @@ public class ReplaysController : Controller
         var service = new ReplaysService(this.config);
 
         var replays = await service.GetReplays();
-        
+
         return Ok(new
         {
             message = "Successfully retrieved replays",
@@ -43,7 +43,7 @@ public class ReplaysController : Controller
         {
             return NotFound(new { message = "Replay not found" });
         }
-        
+
 
         return Ok(new
         {
@@ -59,13 +59,31 @@ public class ReplaysController : Controller
 
         var result = await service.UploadReplay(input);
 
-        if (result.Item1 == 409)
+        if (result.Item1 == 3)
         {
             //replay will have ID=0, I'd need to find it in the db otherwise (unnecessary at least for now)
-            return Conflict(new { message = "Replay already exists" , replay = result.Item2 });
+            return Conflict(new { message = "Replay already exists", replay = result.Item2 });
         }
-        
-        return Ok(new {message = "Successfully uploaded replay", replay = result.Item2});
+
+        if (result.Item1 == 1)
+        {
+            return Ok(new
+            {
+                message = "Reuploaded replay. Elo not updated.",
+                replay = result.Item2
+            });
+        }
+
+        if (result.Item1 == 2)
+        {
+            return Ok(new
+            {
+                message = "Reuploaded replay. Elo updated.",
+                replay = result.Item2
+            });
+        }
+
+        return Ok(new { message = "Successfully uploaded replay", replay = result.Item2 });
     }
 
     [HttpPost("bulk")]
@@ -155,10 +173,18 @@ public class ReplaysController : Controller
             {
                 message =
                     "Replays corresponding to the report not found. Make sure you are uploading the report after both replays are submitted" +
-                    " and in the same channel as they were submitted."
+                    " and in the same channel as they were submitted. It is also possible that the report was already submitted."
             });
         }
-        
+
+        if (res.Item1 == 4)
+        {
+            return BadRequest(new
+            {
+                message = "Report is invalid."
+            });
+        }
+
         return Ok(new
         {
             message = "Successfully uploaded report.",
@@ -166,7 +192,7 @@ public class ReplaysController : Controller
         });
     }
 }
-
+    
 
 
 

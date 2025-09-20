@@ -334,13 +334,13 @@ public class PlayersService : SodbotService
     }
     
     
-    public async Task<int> GuessPlayersIdFromUploads(string discordId)
+    public async Task<Tuple<int, int>> GuessPlayersIdFromUploads(string discordId)
     {
         var count = this.Context.Replays.Count(r => r.UploadedBy == discordId);
 
         if (count < 5)
         {
-            return -1;
+            return new(1, 0);
         }
 
         var idList = await this.GetPlayersListFromDiscordUserUploadsOrderDesc(discordId);
@@ -353,23 +353,23 @@ public class PlayersService : SodbotService
         if (idList.Count < 2)
         {
             //should never happen since replays including AI are not uploaded, but just in case
-            return -2;
+            return new(2, 0);
         }
 
         var secondHighestId = idList[1];
         
         if (ratioHighest < 0.75 && count <= 10)
         {
-            return -4;
+            return new(3, 0);
         }
         
         if (ratioHighest < secondHighestId.ReplayCount / Convert.ToDouble(count) + 0.3)
         {
-            return -3;
+            return new(4, 0);
         }
 
 
-        return highestId.PlayerId;
+        return new(0, highestId.PlayerId);
     }
     
     private async Task<List<PlayerIdWithReplayCount>> GetPlayersListFromDiscordUserUploadsOrderDesc(string discordId)

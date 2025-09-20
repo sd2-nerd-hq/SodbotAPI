@@ -84,14 +84,14 @@ public class PlayersController : Controller
             });
         }
 
-        var playerId = await service.GuessPlayersIdFromUploads(discordId);
+        var ret = await service.GuessPlayersIdFromUploads(discordId);
 
-        if (playerId <= 0)
+        if (ret.Item1 > 0)
         {
             return NotFound(new { message = "Results inconclusive." });
         }
         
-        player = await service.GetPlayer(playerId);
+        player = await service.GetPlayer(ret.Item2);
 
         return Ok(new
         {

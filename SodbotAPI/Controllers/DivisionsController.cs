@@ -24,7 +24,7 @@ public class DivisionsController : Controller
         return Ok(new
         {
             message = "Successfully retrieved divisions",
-            output
+            divisions = output
         });
     }
     
@@ -33,12 +33,12 @@ public class DivisionsController : Controller
     {
         var service = new DivisionsService(this.config);
 
-        var output = service.AddMissingDivisions(input);
+        var output = service.UpdateDivisions(input);
 
         return Ok(new
         {
-            message = "Successfully added missing divisions",
-            output
+            message = "Successfully updated divisions",
+            divisions = output
         });
     }
 }
