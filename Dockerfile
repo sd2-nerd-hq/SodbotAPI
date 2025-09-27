@@ -1,4 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+RUN apt-get update && apt-get install nano
+
 WORKDIR /src
 
 COPY ["SodbotAPI/SodbotAPI.csproj", "SodbotAPI/"]

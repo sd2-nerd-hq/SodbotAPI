@@ -6,6 +6,7 @@ using SodbotAPI.DB.Models;
 using SodbotAPI.DB.Models.PlayersDtos;
 using SodbotAPI.DB.Models.ReplaysDtos;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace SodbotAPI.Services;
 
@@ -205,18 +206,54 @@ public class PlayersService : SodbotService
         return expected;
     }
 
-    public Player? AddPlayer(Player player)
+    public async Task<Player?> AddPlayer(Player player)
     {
         this.Context.Players.Add(player);
 
-        this.Context.SaveChanges();
+        await this.Context.SaveChangesAsync();
 
         return player;
     }
+    
 
-    public Player? UpdatePlayerDiscordId(int id, PlayerPutDto input)
+    private async Task<Tuple<int, Player?>> UpdatePlayer(Player player, PlayerPutDto input)
     {
-                var player = this.Context.Players.Find(id);
+        
+        //unregister player
+        if (input.DiscordId is null)
+        {
+            player.DiscordId = null;
+            await this.Context.SaveChangesAsync();
+            
+            return new Tuple<int, Player?>(1, player);
+        }
+
+        //is already registered
+        if (player.DiscordId is not null) 
+        {
+            return new Tuple<int, Player?>(2, player);
+        }
+        
+        player.DiscordId = input.DiscordId;
+        await this.Context.SaveChangesAsync();
+        
+        return new (0, player);
+    }
+    
+    public async Task<Tuple<int, Player?>> UpdatePlayerDiscordId(string discordId, PlayerPutDto input)
+    {
+        var player = await this.Context.Players.FirstOrDefaultAsync(p => p.DiscordId == discordId);
+
+        if (player is null)
+        {
+            return new Tuple<int, Player?>(3, null);
+        }
+
+        return await this.UpdatePlayer(player, input);
+    }
+    public async Task<Tuple<int, Player?>> UpdatePlayerDiscordId(int id, PlayerPutDto input)
+    {
+        var player = await this.Context.Players.FindAsync(id);
 
         if (player is null)
         {
@@ -226,20 +263,12 @@ public class PlayersService : SodbotService
                 DiscordId = input.DiscordId,
                 Nickname = input.Nickname
             };
-
-            this.AddPlayer(player);
-            return player;
+            
+            await this.AddPlayer(player);
+            return new (0, player);
         }
 
-        if (player.DiscordId is not null)
-        {
-            return null;
-        }
-
-        player.DiscordId = input.DiscordId;
-        this.Context.SaveChanges();
-
-        return player;
+        return await this.UpdatePlayer(player, input);
     }
 
     public IEnumerable<PlayerWithRank> GetPlayersWithRank(int? pageSize, int? pageNumber, PropertyInfo eloType)

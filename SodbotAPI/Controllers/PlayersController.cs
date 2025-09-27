@@ -218,28 +218,96 @@ public class PlayersController : Controller
     }
 
     [HttpPut("{id:int}")]
-    public IActionResult UpdatePlayer(int id, [FromBody] PlayerPutDto player)
+    public async Task<IActionResult> UpdatePlayer(int id, [FromBody] PlayerPutDto player)
     {
+        var service = new PlayersService(this.config);
         try
         {
-            var service = new PlayersService(this.config);
-
-            var result = service.UpdatePlayerDiscordId(id, player);
-
-            if (result is null)
+            var result = await service.UpdatePlayerDiscordId(id, player);
+            
+            if (result.Item1 == 2)
             {
-                return BadRequest(new { message = "Player is already registered" });
+                return Conflict(new
+                {
+                    message = "Already registered. Please unregister first.",
+                    player = result.Item2
+                });
+            }
+
+            if (result.Item1 == 1)
+            {
+                return Ok(new
+                {
+                    message = "Successfully unregistered.",
+                    player = result.Item2
+                });
             }
 
             return Ok(new
             {
                 message = "Successfully updated player",
-                player = result
+                player = result.Item2
             });
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
         {
-            return Conflict(new { message = "Discord ID already registered" });
+            //can't be null because the discord ID is conflicting with an existing one
+            var conflicting = await service.GetPlayer(player.DiscordId!);
+            
+            return Conflict(new
+            {
+                message = "Discord ID already registered",
+                player = conflicting
+            });
+        }
+    }
+
+    [HttpPut("discordId/{discordId}")]
+    public async Task<IActionResult> UpdatePlayer(string discordId, [FromBody] PlayerPutDto player)
+    {
+        var service = new PlayersService(this.config);
+        try
+        {
+            var result = await service.UpdatePlayerDiscordId(discordId, player);
+            
+            if (result.Item1 == 3)
+            {
+               return NotFound(new {message = "Player not registered yet."}); 
+            }
+
+            if (result.Item1 == 2)
+            {
+                return Conflict(new
+                {
+                    message = "Already registered. Please unregister first.",
+                    player = result.Item2
+                });
+            }
+
+            if (result.Item1 == 1)
+            {
+                return Ok(new
+                {
+                    message = "Successfully unregistered.",
+                    player = result.Item2
+                });
+            }
+
+            return Ok(new
+            {
+                message = "Player registered.",
+                player = result.Item2
+            });
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            var conflicting = await service.GetPlayer(discordId);
+            
+            return Conflict(new
+            {
+                message = "Discord ID already registered",
+                player = conflicting
+            });
         }
     }
 }
